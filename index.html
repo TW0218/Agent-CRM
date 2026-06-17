@@ -530,6 +530,8 @@ function viewMatchReport(id){
       <span class="tag gray">${fmt(r.date)}</span>
       <span class="tag gray">視察: ${esc(r.scoutName||'—')}</span>
     </div>
+    ${(r.goals&&r.goals.length)?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding:8px 10px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">${r.goals.map(g=>{const col=g.team==='home'?'#185FA5':'#E24B4A';return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 7px;border-radius:12px;background:${col}18;border:1px solid ${col}40;color:${col}"><span style="font-weight:700">${g.minute?g.minute+"'":''}</span><span>${esc(g.scorer)}</span>${g.assist?`<span style="color:var(--txt3);font-size:10px">(A:${esc(g.assist)})</span>`:''}</span>`;}).join('')}</div>`:''}
+
     <div class="tab-bar">
       <button class="tab-btn active" id="tb-pitch" onclick="swTab('pitch',this)"><i class="ti ti-layout-dashboard"></i> フォーメーション</button>
       <button class="tab-btn" id="tb-home" onclick="swTab('home',this)"><i class="ti ti-users"></i> ${esc(r.homeTeam)}（${allHome.length}名）</button>
@@ -703,6 +705,30 @@ function swTab(tab,btn){
     if(b)b.classList.toggle('active',t===tab);
   });
 }
+function goalRowHtml(g={},i,homeTeam,awayTeam){
+  const idx=i??document.querySelectorAll('.goal-row').length;
+  const teamOpts=[['home',homeTeam||'ホーム'],['away',awayTeam||'アウェイ']].map(([v,l])=>`<option value="${v}" ${g.team===v?'selected':''}>${esc(l)}</option>`).join('');
+  return`<div class="goal-row" style="display:grid;grid-template-columns:44px 1fr 1fr auto;gap:4px;margin-bottom:4px;align-items:center" data-idx="${idx}">
+    <input name="g_min_${idx}" type="number" min="1" max="120" value="${g.minute||''}" placeholder="分" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--txt);text-align:center">
+    <select name="g_team_${idx}" style="font-size:11px;padding:4px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--txt)">${teamOpts}</select>
+    <input name="g_scorer_${idx}" value="${esc(g.scorer||'')}" placeholder="得点者" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--txt)">
+    <input name="g_assist_${idx}" value="${esc(g.assist||'')}" placeholder="アシスト" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--txt)">
+    <button type="button" onclick="this.closest('.goal-row').remove();reindexGoals()" style="background:none;border:none;cursor:pointer;color:var(--txt3);padding:2px"><i class="ti ti-x"></i></button>
+  </div>`;
+}
+function addGoalRow(){
+  const list=document.getElementById('goals-list');
+  const homeTeam=document.querySelector('[name=homeTeam]')?.value||'';
+  const awayTeam=document.querySelector('[name=awayTeam]')?.value||'';
+  const idx=list.querySelectorAll('.goal-row').length;
+  list.insertAdjacentHTML('beforeend',goalRowHtml({},idx,homeTeam,awayTeam));
+}
+function reindexGoals(){
+  document.querySelectorAll('.goal-row').forEach((row,i)=>{
+    row.dataset.idx=i;
+    row.querySelectorAll('[name]').forEach(el=>{el.name=el.name.replace(/\d+$/,i);});
+  });
+}
 function matchReportForm(r={}){
   const hp=r.homePlayers||Array(20).fill(0).map(()=>({name:'',position:'',club:'',age:'',foot:'',num:'',bench:false}));
   const ap=r.awayPlayers||Array(20).fill(0).map(()=>({name:'',position:'',club:'',age:'',foot:'',num:'',bench:false}));
@@ -737,7 +763,14 @@ function matchReportForm(r={}){
       <input type="file" id="sheet-upload" accept="image/*" style="display:none" onchange="handleSheetFile(this.files[0])">
     </div>
     <div class="form-cols"><div class="form-row"><label>ホームチーム *</label><input name="homeTeam" value="${esc(r.homeTeam||'')}"></div><div class="form-row"><label>アウェイチーム *</label><input name="awayTeam" value="${esc(r.awayTeam||'')}"></div></div>
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px"><input name="homeScore" type="number" min="0" value="${r.homeScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#185FA5"><div style="font-size:14px;color:var(--txt3);font-weight:600">-</div><input name="awayScore" type="number" min="0" value="${r.awayScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#E24B4A"></div>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:8px"><input name="homeScore" type="number" min="0" value="${r.homeScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#185FA5"><div style="font-size:14px;color:var(--txt3);font-weight:600">-</div><input name="awayScore" type="number" min="0" value="${r.awayScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#E24B4A"></div>
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label style="font-size:11px;color:var(--txt2);font-weight:500">得点者・アシスト</label>
+        <button type="button" onclick="addGoalRow()" class="btn sm" style="padding:2px 8px"><i class="ti ti-plus"></i> 追加</button>
+      </div>
+      <div id="goals-list">${(r.goals||[]).map((g,i)=>goalRowHtml(g,i,r.homeTeam,r.awayTeam)).join('')}</div>
+    </div>
     <div class="form-cols"><div class="form-row"><label>大会・リーグ</label><input name="competition" value="${esc(r.competition||'')}"></div><div class="form-row"><label>会場</label><input name="venue" value="${esc(r.venue||'')}"></div></div>
     <div class="form-cols"><div class="form-row"><label>日付</label><input name="date" type="date" value="${r.date||''}"></div><div class="form-row"><label>視察者</label><input name="scoutName" value="${esc(r.scoutName||'')}"></div></div>
     <div class="form-cols">
@@ -934,7 +967,15 @@ function saveMR(data){
       if(Object.keys(e).length>2)ev.push(e);
     }
   }
-  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes};
+  const goals=[];
+  let gi=0;
+  while(data[`g_scorer_${gi}`]!==undefined||data[`g_min_${gi}`]!==undefined){
+    const scorer=data[`g_scorer_${gi}`];const minute=data[`g_min_${gi}`];
+    if(scorer||minute)goals.push({team:data[`g_team_${gi}`]||'home',minute:minute?Number(minute):null,scorer:scorer||'',assist:data[`g_assist_${gi}`]||''});
+    gi++;
+  }
+  goals.sort((a,b)=>(a.minute||0)-(b.minute||0));
+  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,goals,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes};
   const recs=DB.get('matchreports');
   if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0)recs[i]={...rec,id:data._id};else recs.push({...rec,id:DB.id()});}
   else recs.push({...rec,id:DB.id()});
