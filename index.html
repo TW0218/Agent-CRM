@@ -1049,6 +1049,8 @@ window.schedCancelCopy=function(){
   const st=window._schState;st.clipboard=null;st.copyKey=null;renderContent();
 };
 window.schedImport=async function(){
+  const st=window._schState;
+  const y=st.year,m=st.month;
   const btn=document.querySelector('#content .btn.primary');
   const orig=btn?btn.innerHTML:'';
   if(btn){btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> 読み込み中...';btn.disabled=true;}
@@ -1069,10 +1071,6 @@ window.schedImport=async function(){
     });
     if(lines.length<2)throw new Error('データが見つかりません');
     const header=lines[0];
-    // ヘッダー行から年月を検出（例: "2026年6月" or シート名から推定）
-    // 列名が "1月","2火" のような形式: 数字部分が日付
-    const st=window._schState;
-    const y=st.year,m=st.month;
     const staffMap={'pat':'pat','nori':'nori','taku':'taku','Pat':'pat','Nori':'nori','Taku':'taku'};
     const data=DB.getObj('schedule');
     let count=0;
