@@ -1058,35 +1058,45 @@ window.schedImport=async function(){
     const res=await fetch(`/api/sheets?year=${y}&month=${m}`);
     if(!res.ok)throw new Error('シートの取得に失敗しました');
     const csv=await res.text();
-    const lines=csv.trim().split('\n').map(l=>{
-      const cols=[];let cur='',inQ=false;
-      for(let i=0;i<l.length;i++){
-        const c=l[i];
-        if(c==='"'){inQ=!inQ;}
-        else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
-        else cur+=c;
+    // セル内改行に対応したCSVパーサー
+    const parseCSV=txt=>{
+      const rows=[];let row=[],cell='',inQ=false;
+      for(let i=0;i<txt.length;i++){
+        const c=txt[i];
+        if(inQ){
+          if(c==='"'&&txt[i+1]==='"'){cell+='"';i++;}
+          else if(c==='"'){inQ=false;}
+          else{cell+=c;}
+        }else{
+          if(c==='"'){inQ=true;}
+          else if(c===','){row.push(cell.trim());cell='';}
+          else if(c==='\n'){row.push(cell.trim());rows.push(row);row=[];cell='';}
+          else if(c!=='\r'){cell+=c;}
+        }
       }
-      cols.push(cur.trim());
-      return cols;
-    });
-    if(lines.length<2)throw new Error('データが見つかりません');
-    const header=lines[0];
-    const staffMap={'pat':'pat','nori':'nori','taku':'taku','Pat':'pat','Nori':'nori','Taku':'taku'};
+      row.push(cell.trim());if(row.some(c=>c))rows.push(row);
+      return rows;
+    };
+    const lines=parseCSV(csv);
+    // 1行目がタイトル行（"2026年6月"など）の場合スキップ、2行目がヘッダー
+    const headerIdx=lines.findIndex(r=>r[0]==='スタッフ名'||r[0]==='Staff');
+    if(headerIdx<0)throw new Error('ヘッダー行（スタッフ名）が見つかりません');
+    const header=lines[headerIdx];
+    const staffMap={Pat:'pat',Nori:'nori',Taku:'taku',pat:'pat',nori:'nori',taku:'taku'};
     const data=DB.getObj('schedule');
     let count=0;
-    // header[0]=スタッフ名列, header[1]以降=各日
-    for(let row=1;row<lines.length;row++){
+    for(let row=headerIdx+1;row<lines.length;row++){
       const cols=lines[row];
       if(!cols||!cols[0])continue;
       const sid=staffMap[cols[0].trim()];
       if(!sid)continue;
       for(let col=1;col<header.length;col++){
-        const dayStr=header[col].replace(/[^0-9]/g,'');
-        const day=parseInt(dayStr);
+        const day=parseInt(header[col].replace(/[^0-9]/g,''));
         if(!day||day<1||day>31)continue;
-        const txt=(cols[col]||'').replace(/^"|"$/g,'').trim();
+        const txt=(cols[col]||'').trim();
+        if(!txt)continue;
         const k=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}_${sid}`;
-        if(txt){data[k]={text:txt,sz:'sm'};count++;}
+        data[k]={text:txt,sz:'sm'};count++;
       }
     }
     DB.set('schedule',data);
