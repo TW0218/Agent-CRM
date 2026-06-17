@@ -244,6 +244,7 @@ const SKEY='sb_publishable_b04LWH253h7yFLTRRefqCQ_VozK30io';
 const _cache={};
 const DB={
   get(k){return _cache[k]||[]},
+  getObj(k){const v=_cache[k];return(v&&!Array.isArray(v))?v:{}},
   set(k,v){
     _cache[k]=v;
     fetch(SURL+'/rest/v1/crm_data?on_conflict=key',{method:'POST',headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:v})}).catch(e=>console.error('DB.set error',e.message));
@@ -923,7 +924,7 @@ function rContracts(){
   return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
 }
 function rSchedule(){
-  const schData=DB.get('schedule')||{};
+  const schData=DB.getObj('schedule');
   const today=new Date();
   if(!window._schState)window._schState={year:today.getFullYear(),month:today.getMonth(),clipboard:null,copyKey:null};
   const st=window._schState;
@@ -1005,7 +1006,7 @@ function rSchedule(){
 window.schedMonth=function(d){const st=window._schState;st.month+=d;if(st.month<0){st.month=11;st.year--;}if(st.month>11){st.month=0;st.year++;}renderContent();};
 window.schedOpen=function(k,name,day){
   const st=window._schState;if(st.clipboard)return;
-  st._editKey=k;const entry=(DB.get('schedule')||{})[k]||{};
+  st._editKey=k;const entry=(DB.getObj('schedule'))[k]||{};
   document.getElementById('sch-modal-title').textContent=`${name} — ${st.month+1}/${day}`;
   document.getElementById('sch-text').value=entry.text||'';
   st._curSz=entry.sz||'md';
@@ -1022,25 +1023,25 @@ window.schedSz=function(sz){
 window.schedSave=function(){
   const st=window._schState;
   const txt=document.getElementById('sch-text').value.trim();
-  const data=DB.get('schedule')||{};
+  const data=DB.getObj('schedule');
   if(txt)data[st._editKey]={text:txt,sz:st._curSz||'md'};
   else delete data[st._editKey];
   DB.set('schedule',data);schedCloseModal();renderContent();
 };
 window.schedDel=function(){
   const st=window._schState;
-  const data=DB.get('schedule')||{};
+  const data=DB.getObj('schedule');
   delete data[st._editKey];DB.set('schedule',data);schedCloseModal();renderContent();
 };
 window.schedCopy=function(e,k){
   e.stopPropagation();
-  const data=DB.get('schedule')||{};
+  const data=DB.getObj('schedule');
   const entry=data[k];if(!entry)return;
   const st=window._schState;st.clipboard={...entry};st.copyKey=k;renderContent();
 };
 window.schedPaste=function(k){
   const st=window._schState;if(!st.clipboard)return;
-  const data=DB.get('schedule')||{};
+  const data=DB.getObj('schedule');
   data[k]={...st.clipboard};DB.set('schedule',data);renderContent();
 };
 window.schedCancelCopy=function(){
