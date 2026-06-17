@@ -972,6 +972,7 @@ function rSchedule(){
       <span style="font-size:14px;font-weight:500;min-width:90px;text-align:center">${mn}</span>
       <button class="btn sm" onclick="schedMonth(1)"><i class="ti ti-chevron-right"></i></button>
       <span style="font-size:11px;color:var(--txt3);margin-left:4px">${st.clipboard?'貼り付け先のセルをタップ':'セルをタップして入力'}</span>
+      <button class="btn sm primary" onclick="schedImport()" style="margin-left:auto;display:flex;align-items:center;gap:4px"><i class="ti ti-table-import"></i> シートから取り込む</button>
     </div>
     <div style="overflow:auto;flex:1">
       <table style="border-collapse:collapse;width:100%;min-width:420px">
@@ -1046,6 +1047,57 @@ window.schedPaste=function(k){
 };
 window.schedCancelCopy=function(){
   const st=window._schState;st.clipboard=null;st.copyKey=null;renderContent();
+};
+window.schedImport=async function(){
+  const btn=document.querySelector('#content .btn.primary');
+  const orig=btn?btn.innerHTML:'';
+  if(btn){btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> 読み込み中...';btn.disabled=true;}
+  try{
+    const res=await fetch('/api/sheets');
+    if(!res.ok)throw new Error('シートの取得に失敗しました');
+    const csv=await res.text();
+    const lines=csv.trim().split('\n').map(l=>{
+      const cols=[];let cur='',inQ=false;
+      for(let i=0;i<l.length;i++){
+        const c=l[i];
+        if(c==='"'){inQ=!inQ;}
+        else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+        else cur+=c;
+      }
+      cols.push(cur.trim());
+      return cols;
+    });
+    if(lines.length<2)throw new Error('データが見つかりません');
+    const header=lines[0];
+    // ヘッダー行から年月を検出（例: "2026年6月" or シート名から推定）
+    // 列名が "1月","2火" のような形式: 数字部分が日付
+    const st=window._schState;
+    const y=st.year,m=st.month;
+    const staffMap={'pat':'pat','nori':'nori','taku':'taku','Pat':'pat','Nori':'nori','Taku':'taku'};
+    const data=DB.getObj('schedule');
+    let count=0;
+    // header[0]=スタッフ名列, header[1]以降=各日
+    for(let row=1;row<lines.length;row++){
+      const cols=lines[row];
+      if(!cols||!cols[0])continue;
+      const sid=staffMap[cols[0].trim()];
+      if(!sid)continue;
+      for(let col=1;col<header.length;col++){
+        const dayStr=header[col].replace(/[^0-9]/g,'');
+        const day=parseInt(dayStr);
+        if(!day||day<1||day>31)continue;
+        const txt=(cols[col]||'').replace(/^"|"$/g,'').trim();
+        const k=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}_${sid}`;
+        if(txt){data[k]={text:txt,sz:'sm'};count++;}
+      }
+    }
+    DB.set('schedule',data);
+    renderContent();
+    alert(`✅ ${count}件のスケジュールを取り込みました`);
+  }catch(e){
+    alert('❌ エラー: '+e.message);
+    if(btn){btn.innerHTML=orig;btn.disabled=false;}
+  }
 };
 function setFilter(k,v){S.filter[k]=v;renderContent();}
 function showModal(title,formHtml,onSave,onDelete){
