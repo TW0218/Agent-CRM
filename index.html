@@ -253,8 +253,13 @@ const DB={
     try{
       const r=await fetch(SURL+'/rest/v1/crm_data?select=key,value',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}});
       const rows=await r.json();
-      if(Array.isArray(rows))rows.forEach(row=>{_cache[row.key]=row.value||[];});
+      if(Array.isArray(rows))rows.forEach(row=>{if(!row.key.startsWith('contract_pdf_'))_cache[row.key]=row.value||[];});
     }catch(e){console.error('DB.load error',e);}
+  },
+  async fetchOne(k){
+    const r=await fetch(SURL+'/rest/v1/crm_data?key=eq.'+encodeURIComponent(k)+'&select=value',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}});
+    const rows=await r.json();
+    return(Array.isArray(rows)&&rows[0])?rows[0].value:null;
   },
   id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 };
@@ -921,7 +926,7 @@ function rReminders(){
 function rContracts(){
   let data=DB.get('contracts');
   if(S.search)data=data.filter(c=>c.clubName?.toLowerCase().includes(S.search)||c.playerName?.toLowerCase().includes(S.search));
-  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
+  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th><th>契約書</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td><td onclick="event.stopPropagation()">${c.hasPdf?`<button class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> DL</button>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
 }
 function rSchedule(){
   const schData=DB.getObj('schedule');
@@ -1126,22 +1131,42 @@ function showModal(title,formHtml,onSave,onDelete){
   window._md=onDelete;
 }
 function closeModal(){document.getElementById('modal-root').innerHTML='';renderContent();}
+async function downloadContractPDF(id,name){
+  const btn=event.target.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
+  try{
+    const rec=await DB.fetchOne('contract_pdf_'+id);
+    if(!rec||!rec.data){alert('PDFが見つかりません');return;}
+    const a=document.createElement('a');a.href=rec.data;a.download=name||'contract.pdf';a.click();
+  }catch(e){alert('ダウンロードに失敗しました');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-download"></i> ダウンロード';}}
+}
 function submitForm(){
   const form=document.getElementById('modal-root').querySelector('form');
   if(!form)return;
   const data={};
-  new FormData(form).forEach((v,k)=>data[k]=v);
+  new FormData(form).forEach((v,k)=>{if(!(v instanceof File))data[k]=v;});
   form.querySelectorAll('input[type=hidden]').forEach(el=>data[el.name]=el.value);
-  window._ms&&window._ms(data);closeModal();
+  const fileInput=form.querySelector('input[type=file]');
+  const file=fileInput?.files?.[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>{data.pdfData=e.target.result;data.pdfName=file.name;window._ms&&window._ms(data);closeModal();};
+    reader.readAsDataURL(file);
+  }else{
+    window._ms&&window._ms(data);closeModal();
+  }
 }
 function saveRecord(type,data){
   if(type==='matchreports'){saveMR(data);return;}
   if(type==='scouting'){data.positions=[data.pos0,data.pos1,data.pos2].filter(Boolean);delete data.pos0;delete data.pos1;delete data.pos2;}
   if(type==='players'){data.positions=[data.ppos0,data.ppos1,data.ppos2].filter(Boolean);data.position=data.positions[0]||'';delete data.ppos0;delete data.ppos1;delete data.ppos2;}
+  const pdfData=data.pdfData;const pdfName=data.pdfName;delete data.pdfData;delete data.pdfName;
   const recs=DB.get(type);
-  if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0){recs[i]={...recs[i],...data,id:data._id};delete recs[i]._id;}else recs.push({...data,id:DB.id()});}
-  else recs.push({...data,id:DB.id()});
+  let id;
+  if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0){if(pdfData){recs[i].hasPdf=true;recs[i].pdfName=pdfName;}recs[i]={...recs[i],...data,id:data._id};delete recs[i]._id;id=data._id;}else{id=DB.id();recs.push({...data,id,hasPdf:!!pdfData,pdfName:pdfName||undefined});}}
+  else{id=DB.id();recs.push({...data,id,hasPdf:!!pdfData,pdfName:pdfName||undefined});}
   DB.set(type,recs);
+  if(pdfData)DB.set('contract_pdf_'+id,{name:pdfName,data:pdfData});
 }
 function saveMR(data){
   const hp=[],ap=[],ev=[];
@@ -1273,7 +1298,7 @@ function reportForm(r={}){
   </div>`:'';
   return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('playerName','選手名',r.playerName)}${f('teamName','チーム名',r.teamName)}</div>${f('scout','視察者',r.scout)}<div class="form-row"><label>弊社契約と紐付け</label><select name="linkedPlayerId"><option value="">紐付けなし</option>${players.map(p=>`<option value="${p.id}" ${r.linkedPlayerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>${linkedHtml}</div><div class="form-row"><label>ポジション（最大3つ）</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${[0,1,2].map(i=>`<input type="text" name="pos${i}" value="${esc((r.positions||[])[i]||'')}" placeholder="ポジション${i+1}" style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none">`).join('')}</div></div><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:12px"><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">生年月日</label><input type="date" name="birthdate" value="${r.birthdate||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">年齢</label><input type="number" name="age" value="${r.age||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">学年</label><input type="text" name="grade" value="${r.grade||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">身長 (cm)</label><input type="number" name="height" value="${r.height||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">体重 (kg)</label><input type="number" name="weight" value="${r.weight||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div>${fs('scoutStatus','ステータス',[['','未設定'],['有力選手','有力選手'],['継続監視','継続監視'],['契約打診','契約打診'],['獲得推奨','獲得推奨'],['見送り','見送り']],r.scoutStatus||'')}${ft('notes','メモ',r.notes)}${ft('strengths','強み',r.strengths)}${ft('weaknesses','課題',r.weaknesses)}${memosHtml}</form>`;}
 function reminderForm(r={}){return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('title','タイトル *',r.title)}${fs('type','種別',[['ContractRenewal','契約更新'],['Birthday','誕生日'],['MeetingFollowup','会食フォロー'],['Other','その他']],r.type||'Other')}</div>${f('playerName','選手名',r.playerName)}${f('dueDate','期日 *',r.dueDate,'date')}${ft('notes','メモ',r.notes)}</form>`}
-function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}</form>`}
+function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}<div class="form-row"><label>契約書 (PDF)</label><div style="display:flex;flex-direction:column;gap:6px">${c.hasPdf?`<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--txt2)"><i class="ti ti-file-text" style="color:var(--green)"></i><span>${esc(c.pdfName||'contract.pdf')}</span><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> ダウンロード</button></div>`:''}<input type="file" name="pdfFile" accept="application/pdf" style="font-size:13px"></div></div></form>`}
 document.addEventListener("DOMContentLoaded",()=>DB.load().then(()=>{
   // migrate: remove deprecated fields from scouting records
   const sc=DB.get('scouting');
