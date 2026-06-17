@@ -926,7 +926,7 @@ function rReminders(){
 function rContracts(){
   let data=DB.get('contracts');
   if(S.search)data=data.filter(c=>c.clubName?.toLowerCase().includes(S.search)||c.playerName?.toLowerCase().includes(S.search));
-  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th><th>契約書</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td><td onclick="event.stopPropagation()">${c.hasPdf?`<button class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> DL</button>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
+  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th><th>契約書</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td><td onclick="event.stopPropagation()">${c.hasPdf?`<div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:4px 8px" onclick="previewContractPDF('${c.id}')"><i class="ti ti-eye"></i></button><button class="btn" style="font-size:11px;padding:4px 8px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i></button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
 }
 function rSchedule(){
   const schData=DB.getObj('schedule');
@@ -1131,14 +1131,33 @@ function showModal(title,formHtml,onSave,onDelete){
   window._md=onDelete;
 }
 function closeModal(){document.getElementById('modal-root').innerHTML='';renderContent();}
+async function _fetchPDFBlob(id){
+  const rec=await DB.fetchOne('contract_pdf_'+id);
+  if(!rec||!rec.data)throw new Error('not found');
+  const b64=rec.data.split(',')[1];
+  const bin=atob(b64);const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return{blob:new Blob([bytes],{type:'application/pdf'}),dataUrl:rec.data};
+}
 async function downloadContractPDF(id,name){
   const btn=event.target.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
   try{
-    const rec=await DB.fetchOne('contract_pdf_'+id);
-    if(!rec||!rec.data){alert('PDFが見つかりません');return;}
-    const a=document.createElement('a');a.href=rec.data;a.download=name||'contract.pdf';a.click();
+    const{blob}=await _fetchPDFBlob(id);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=name||'contract.pdf';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
   }catch(e){alert('ダウンロードに失敗しました');}
   finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-download"></i> ダウンロード';}}
+}
+async function previewContractPDF(id){
+  const btn=event.target.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
+  try{
+    const{blob}=await _fetchPDFBlob(id);
+    const url=URL.createObjectURL(blob);
+    window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){alert('プレビューに失敗しました');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i> プレビュー';}}
 }
 function submitForm(){
   const form=document.getElementById('modal-root').querySelector('form');
@@ -1298,7 +1317,7 @@ function reportForm(r={}){
   </div>`:'';
   return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('playerName','選手名',r.playerName)}${f('teamName','チーム名',r.teamName)}</div>${f('scout','視察者',r.scout)}<div class="form-row"><label>弊社契約と紐付け</label><select name="linkedPlayerId"><option value="">紐付けなし</option>${players.map(p=>`<option value="${p.id}" ${r.linkedPlayerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>${linkedHtml}</div><div class="form-row"><label>ポジション（最大3つ）</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${[0,1,2].map(i=>`<input type="text" name="pos${i}" value="${esc((r.positions||[])[i]||'')}" placeholder="ポジション${i+1}" style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none">`).join('')}</div></div><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:12px"><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">生年月日</label><input type="date" name="birthdate" value="${r.birthdate||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">年齢</label><input type="number" name="age" value="${r.age||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">学年</label><input type="text" name="grade" value="${r.grade||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">身長 (cm)</label><input type="number" name="height" value="${r.height||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">体重 (kg)</label><input type="number" name="weight" value="${r.weight||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div>${fs('scoutStatus','ステータス',[['','未設定'],['有力選手','有力選手'],['継続監視','継続監視'],['契約打診','契約打診'],['獲得推奨','獲得推奨'],['見送り','見送り']],r.scoutStatus||'')}${ft('notes','メモ',r.notes)}${ft('strengths','強み',r.strengths)}${ft('weaknesses','課題',r.weaknesses)}${memosHtml}</form>`;}
 function reminderForm(r={}){return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('title','タイトル *',r.title)}${fs('type','種別',[['ContractRenewal','契約更新'],['Birthday','誕生日'],['MeetingFollowup','会食フォロー'],['Other','その他']],r.type||'Other')}</div>${f('playerName','選手名',r.playerName)}${f('dueDate','期日 *',r.dueDate,'date')}${ft('notes','メモ',r.notes)}</form>`}
-function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}<div class="form-row"><label>契約書 (PDF)</label><div style="display:flex;flex-direction:column;gap:6px">${c.hasPdf?`<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--txt2)"><i class="ti ti-file-text" style="color:var(--green)"></i><span>${esc(c.pdfName||'contract.pdf')}</span><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> ダウンロード</button></div>`:''}<input type="file" name="pdfFile" accept="application/pdf" style="font-size:13px"></div></div></form>`}
+function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}<div class="form-row"><label>契約書 (PDF)</label><div style="display:flex;flex-direction:column;gap:6px">${c.hasPdf?`<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--txt2)"><i class="ti ti-file-text" style="color:var(--green)"></i><span>${esc(c.pdfName||'contract.pdf')}</span><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="previewContractPDF('${c.id}')"><i class="ti ti-eye"></i> プレビュー</button><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> ダウンロード</button></div>`:''}<input type="file" name="pdfFile" accept="application/pdf" style="font-size:13px"></div></div></form>`}
 document.addEventListener("DOMContentLoaded",()=>DB.load().then(()=>{
   // migrate: remove deprecated fields from scouting records
   const sc=DB.get('scouting');
