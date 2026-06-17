@@ -1,4 +1,4 @@
-const CACHE = 'agent-crm-v1';
+const CACHE = 'agent-crm-v2';
 const ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
