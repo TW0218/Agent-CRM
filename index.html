@@ -427,7 +427,7 @@ function rMatchReports(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="tag teal">${esc(r.competition||'—')}</span><span style="font-size:11px;color:var(--txt2)">${fmt(r.date)}</span></div>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:10px 0">
       <div style="text-align:right"><div style="font-size:13px;font-weight:600">${esc(r.homeTeam||'—')}</div><div style="font-size:10px;color:var(--txt2)">${esc(r.homeFormation||'—')}</div></div>
-      <div style="font-size:11px;color:var(--txt3)">vs</div>
+      <div style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--txt)">${r.homeScore!=null&&r.awayScore!=null?`${r.homeScore} - ${r.awayScore}`:'vs'}</div></div>
       <div><div style="font-size:13px;font-weight:600">${esc(r.awayTeam||'—')}</div><div style="font-size:10px;color:var(--txt2)">${esc(r.awayFormation||'—')}</div></div>
     </div>
     <div style="font-size:11px;color:var(--txt2)">${esc(r.venue||'—')}</div>
@@ -517,7 +517,7 @@ function viewMatchReport(id){
     </div>`}).join('')}`;
   document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="width:800px" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <h2 style="margin:0">${esc(r.homeTeam)} vs ${esc(r.awayTeam)}</h2>
+      <h2 style="margin:0">${esc(r.homeTeam)} ${r.homeScore!=null&&r.awayScore!=null?`<span style="color:var(--green)">${r.homeScore} - ${r.awayScore}</span>`:''} ${esc(r.awayTeam)}</h2>
       <div style="display:flex;gap:6px">
         <button class="btn sm primary" id="save-pitch-btn" onclick="savePitchPositions('${id}')"><i class="ti ti-device-floppy"></i> 配置保存</button><button class="btn sm" onclick="editMatchReport('${id}')"><i class="ti ti-edit"></i> 編集</button>
         <button class="btn sm danger" onclick="delRec('matchreports','${id}',event);closeModal()"><i class="ti ti-trash"></i></button>
@@ -737,6 +737,7 @@ function matchReportForm(r={}){
       <input type="file" id="sheet-upload" accept="image/*" style="display:none" onchange="handleSheetFile(this.files[0])">
     </div>
     <div class="form-cols"><div class="form-row"><label>ホームチーム *</label><input name="homeTeam" value="${esc(r.homeTeam||'')}"></div><div class="form-row"><label>アウェイチーム *</label><input name="awayTeam" value="${esc(r.awayTeam||'')}"></div></div>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px"><input name="homeScore" type="number" min="0" value="${r.homeScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#185FA5"><div style="font-size:14px;color:var(--txt3);font-weight:600">-</div><input name="awayScore" type="number" min="0" value="${r.awayScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#E24B4A"></div>
     <div class="form-cols"><div class="form-row"><label>大会・リーグ</label><input name="competition" value="${esc(r.competition||'')}"></div><div class="form-row"><label>会場</label><input name="venue" value="${esc(r.venue||'')}"></div></div>
     <div class="form-cols"><div class="form-row"><label>日付</label><input name="date" type="date" value="${r.date||''}"></div><div class="form-row"><label>視察者</label><input name="scoutName" value="${esc(r.scoutName||'')}"></div></div>
     <div class="form-cols">
@@ -933,7 +934,7 @@ function saveMR(data){
       if(Object.keys(e).length>2)ev.push(e);
     }
   }
-  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes};
+  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes};
   const recs=DB.get('matchreports');
   if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0)recs[i]={...rec,id:data._id};else recs.push({...rec,id:DB.id()});}
   else recs.push({...rec,id:DB.id()});
@@ -1040,7 +1041,50 @@ document.addEventListener("DOMContentLoaded",()=>DB.load().then(()=>{
   const cleaned=sc.map(r=>{const{playerNameCustom,matchTitle,technical,physical,tactical,mental,overall,...rest}=r;return rest;});
   if(JSON.stringify(sc)!==JSON.stringify(cleaned))DB.set('scouting',cleaned);
   render();
+  initNotifications();
 }));
+
+// ① Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(e=>console.warn('SW registration failed',e));
+}
+
+// ② プッシュ通知（シンプル版 — 起動時チェック）
+function initNotifications(){
+  if(!('Notification' in window))return;
+  Notification.requestPermission().then(perm=>{if(perm==='granted')checkAndNotify();});
+}
+function checkAndNotify(){
+  const today=new Date();
+  const notified=JSON.parse(localStorage.getItem('ssg_notified')||'{}');
+  const notify=(key,title,body)=>{
+    if(notified[key])return;
+    new Notification(title,{body,icon:'/icons/icon-192.png'});
+    notified[key]=true;
+  };
+  // 弊社契約 — 90日以内
+  DB.get('players').forEach(p=>{
+    if(!p.contractExpiry)return;
+    const d=Math.round((new Date(p.contractExpiry)-today)/86400000);
+    if(d>=0&&d<=90)notify(`player-${p.id}-90`,`代理人契約期限 ${d}日前`,`${p.name}（${p.currentClub||'—'}）の契約期限が迫っています`);
+  });
+  // チーム契約 — 90日以内
+  DB.get('contracts').forEach(c=>{
+    if(!c.expiryDate)return;
+    const d=Math.round((new Date(c.expiryDate)-today)/86400000);
+    if(d>=0&&d<=90)notify(`contract-${c.id}-90`,`チーム契約期限 ${d}日前`,`${c.playerName||'—'}（${c.clubName||'—'}）の契約期限が迫っています`);
+  });
+  // リマインダー — 期日当日・超過
+  DB.get('reminders').forEach(r=>{
+    if(r.done||!r.dueDate)return;
+    const d=Math.round((new Date(r.dueDate)-today)/86400000);
+    if(d<=0)notify(`reminder-${r.id}`,`リマインダー: ${r.title}`,`${r.playerName?r.playerName+' / ':''}${d<0?Math.abs(d)+'日超過':'本日期限'}`);
+  });
+  // 翌日リセット
+  const todayKey=today.toISOString().slice(0,10);
+  if(notified._date!==todayKey){Object.keys(notified).forEach(k=>delete notified[k]);notified._date=todayKey;}
+  localStorage.setItem('ssg_notified',JSON.stringify(notified));
+}
 </script>
 </body>
 </html>
