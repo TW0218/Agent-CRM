@@ -158,9 +158,10 @@ tr:last-child td{border-bottom:none}
   .eval-row{grid-template-columns:24px 18px 1fr 34px 34px;font-size:11px}
   .mobile-nav{display:flex!important}
 }
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid rgba(255,255,255,0.1);z-index:100;height:56px;overflow-x:auto;overflow-y:hidden}
-.mobile-nav-item{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 14px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:9px;gap:3px;border-top:2px solid transparent;min-width:60px}
-.mobile-nav-item i{font-size:18px}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid rgba(255,255,255,0.1);z-index:100;height:64px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:none}
+.mobile-nav::-webkit-scrollbar{display:none}
+.mobile-nav-item{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 16px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:9px;gap:3px;border-top:2px solid transparent;min-width:68px;scroll-snap-align:start}
+.mobile-nav-item i{font-size:20px}
 .mobile-nav-item.active{color:var(--green);border-top-color:var(--green)}
 </style>
 </head>
