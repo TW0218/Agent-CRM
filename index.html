@@ -947,7 +947,8 @@ function rSchedule(){
       const entry=schData[k];
       const isSource=k===st.copyKey;
       const isPaste=!!st.clipboard&&!isSource;
-      const bgStyle=isSource?'background:rgba(0,196,106,0.1);outline:2px solid var(--green);outline-offset:-2px':isToday?'background:rgba(0,196,106,0.03)':'';
+      const isOff=entry&&/\boff\b/i.test(entry.text);
+      const bgStyle=isSource?'background:rgba(0,196,106,0.1);outline:2px solid var(--green);outline-offset:-2px':isOff?'background:#FFF9C4':isToday?'background:rgba(0,196,106,0.03)':'';
       const oc=isPaste?`schedPaste('${k}')`:st.clipboard?'':` schedOpen('${k}','${s.name}',${d})`;
       const szStyle=entry&&entry.sz==='sm'?'font-size:10px':entry&&entry.sz==='lg'?'font-size:13px':'font-size:11px';
       row+=`<td style="border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:0;vertical-align:middle">
