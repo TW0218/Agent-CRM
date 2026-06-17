@@ -1051,6 +1051,9 @@ window.schedCancelCopy=function(){
 window.schedImport=async function(){
   const st=window._schState;
   const y=st.year,m=st.month;
+  const MONTHS_EN2=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  alert(`DEBUG: year=${y} month=${m} → ${y}${MONTHS_EN2[m]}`);
+  return;
   const btn=document.querySelector('#content .btn.primary');
   const orig=btn?btn.innerHTML:'';
   if(btn){btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> 読み込み中...';btn.disabled=true;}
