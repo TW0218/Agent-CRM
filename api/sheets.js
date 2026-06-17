@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const SHEET_ID = '1uxo1zGHJzcaEdbqbeeJLMUdvfzyaQbYc';
+  const SHEET_ID = '1yoGe4xa7rKx9yC0Rs1HBDZZE3nQKkHVJNVEZ-0V-LBc';
   const { sheet } = req.query;
   if (!sheet) return res.status(400).json({ error: 'sheet parameter required' });
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(sheet)}`;
