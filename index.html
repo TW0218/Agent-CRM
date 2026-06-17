@@ -1053,7 +1053,7 @@ window.schedImport=async function(){
   const orig=btn?btn.innerHTML:'';
   if(btn){btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> 読み込み中...';btn.disabled=true;}
   try{
-    const res=await fetch('/api/sheets');
+    const res=await fetch(`/api/sheets?year=${y}&month=${m}`);
     if(!res.ok)throw new Error('シートの取得に失敗しました');
     const csv=await res.text();
     const lines=csv.trim().split('\n').map(l=>{
