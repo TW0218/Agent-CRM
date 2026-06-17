@@ -284,17 +284,45 @@ function hideSuggest(){const b=document.getElementById('suggest-box');if(b)b.sty
 function handleSearch(v){
   S.search=v.toLowerCase();
   renderContent();
-  if(S.tab==='matchreports'&&v.length>0){
-    const norm=s=>(s||'').toLowerCase().replace(/\s+/g,'');
-    const q=v.toLowerCase().replace(/\s+/g,'');
-    const names=new Set();
-    DB.get('matchreports').forEach(r=>[...(r.homePlayers||[]),...(r.awayPlayers||[])].forEach(p=>{if(p.name&&norm(p.name).includes(q))names.add(p.name);}));
-    const box=document.getElementById('suggest-box');
-    if(box&&names.size>0){
-      box.innerHTML=[...names].sort().slice(0,12).map(n=>`<div onclick="selectSuggest('${n.replace(/'/g,"\\'")}')" style="padding:7px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">${esc(n)}</div>`).join('');
-      box.style.display='block';
-    }else if(box){box.style.display='none';}
-  }else{hideSuggest();}
+  if(!v){hideSuggest();return;}
+  const q=v.toLowerCase().replace(/\s+/g,'');
+  const norm=s=>(s||'').toLowerCase().replace(/\s+/g,'');
+  const results=[];
+  // 弊社契約
+  DB.get('players').forEach(p=>{if(norm(p.name).includes(q)||norm(p.currentClub).includes(q))results.push({tab:'players',icon:'ti-users',label:esc(p.name),sub:esc(p.currentClub||''),id:p.id});});
+  // 選手レポート
+  DB.get('scouting').forEach(r=>{if(norm(r.playerName).includes(q)||norm(r.teamName).includes(q))results.push({tab:'scouting',icon:'ti-user-search',label:esc(r.playerName),sub:esc(r.teamName||''),id:r.id});});
+  // 試合レポート（チーム名・選手名）
+  DB.get('matchreports').forEach(r=>{
+    const inTeam=norm(r.homeTeam).includes(q)||norm(r.awayTeam).includes(q);
+    const matchedP=[...(r.homePlayers||[]),...(r.awayPlayers||[])].filter(p=>norm(p.name).includes(q));
+    if(inTeam)results.push({tab:'matchreports',icon:'ti-ball-football',label:esc(r.homeTeam)+' vs '+esc(r.awayTeam),sub:fmt(r.date),id:r.id,action:'view'});
+    matchedP.forEach(p=>{if(!results.find(x=>x.id===r.id&&x.tab==='matchreports'))results.push({tab:'matchreports',icon:'ti-ball-football',label:esc(r.homeTeam)+' vs '+esc(r.awayTeam),sub:`${esc(p.name)} 出場`,id:r.id,action:'view'});});
+  });
+  // クラブ
+  DB.get('clubs').forEach(c=>{if(norm(c.name).includes(q))results.push({tab:'clubs',icon:'ti-building',label:esc(c.name),sub:esc(c.league||''),id:c.id});});
+  // チーム契約
+  DB.get('contracts').forEach(c=>{if(norm(c.playerName).includes(q)||norm(c.clubName).includes(q))results.push({tab:'contracts',icon:'ti-file-text',label:esc(c.playerName),sub:esc(c.clubName||''),id:c.id});});
+  const tabLabel={players:'弊社契約',scouting:'選手レポート',matchreports:'試合レポート',clubs:'クラブ',contracts:'チーム契約'};
+  const box=document.getElementById('suggest-box');
+  if(!box)return;
+  if(results.length===0){box.style.display='none';return;}
+  box.innerHTML=results.slice(0,15).map(r=>`<div onclick="goToResult('${r.tab}','${r.id}','${r.action||''}')" style="padding:7px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
+    <i class="ti ${r.icon}" style="font-size:13px;color:var(--txt3);flex-shrink:0"></i>
+    <div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.label}</div><div style="font-size:10px;color:var(--txt3)">${r.sub}</div></div>
+    <span style="font-size:10px;color:var(--txt3);flex-shrink:0">${tabLabel[r.tab]||''}</span>
+  </div>`).join('');
+  box.style.display='block';
+}
+function goToResult(tab,id,action){
+  hideSuggest();
+  document.getElementById('search-input').value='';
+  S.search='';
+  S.tab=tab;render();
+  setTimeout(()=>{
+    if(action==='view')viewMatchReport(id);
+    else editRecord(tab,id);
+  },80);
 }
 function selectSuggest(name){
   const inp=document.getElementById('search-input');
@@ -368,9 +396,10 @@ function rDeals(){
 }
 function rScouting(){
   let data=DB.get('scouting');
+  const players=DB.get('players');
   if(S.search)data=data.filter(r=>r.playerName?.toLowerCase().includes(S.search)||r.teamName?.toLowerCase().includes(S.search));
   return`
-  ${data.length?`<div class="cards-grid">${data.map(r=>{const scol2={有力選手:'green',継続視察:'orange',契約打診:'teal',獲得推奨:'green',継続監視:'orange',見送り:'red'}[r.scoutStatus]||'gray';return`<div class="card" onclick="editRecord('scouting','${r.id}')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:13px;font-weight:600">${esc(r.playerName||'—')}</div>${r.scoutStatus?`<span class="tag ${scol2}">${esc(r.scoutStatus)}</span>`:''}</div><div style="font-size:11px;color:var(--txt2);margin-bottom:4px">${[r.teamName,r.grade,r.age?r.age+'歳':'',r.height?r.height+'cm':'',r.weight?r.weight+'kg':''].filter(Boolean).join(' / ')}</div>${(r.positions||[]).length?`<div style="display:flex;gap:4px;margin-bottom:6px">${(r.positions||[]).map(p=>`<span class="tag pos">${esc(p)}</span>`).join('')}</div>`:''}<div style="font-size:10px;color:var(--txt3);margin-top:4px">${r.scout?`視察者: ${esc(r.scout)}`:''}</div></div>`;}).join('')}</div>`:`<div class="empty"><i class="ti ti-user-search"></i><p>選手レポートがありません</p></div>`}`;
+  ${data.length?`<div class="cards-grid">${data.map(r=>{const scol2={有力選手:'green',継続視察:'orange',契約打診:'teal',獲得推奨:'green',継続監視:'orange',見送り:'red'}[r.scoutStatus]||'gray';const linked=r.linkedPlayerId?players.find(p=>p.id===r.linkedPlayerId):null;const cs=linked?ccol(linked.contractExpiry):'';return`<div class="card" onclick="editRecord('scouting','${r.id}')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:13px;font-weight:600">${esc(r.playerName||'—')}</div>${r.scoutStatus?`<span class="tag ${scol2}">${esc(r.scoutStatus)}</span>`:''}</div><div style="font-size:11px;color:var(--txt2);margin-bottom:4px">${[r.teamName,r.grade,r.age?r.age+'歳':'',r.height?r.height+'cm':'',r.weight?r.weight+'kg':''].filter(Boolean).join(' / ')}</div>${(r.positions||[]).length?`<div style="display:flex;gap:4px;margin-bottom:6px">${(r.positions||[]).map(p=>`<span class="tag pos">${esc(p)}</span>`).join('')}</div>`:''}<div style="font-size:10px;color:var(--txt3);margin-top:4px">${r.scout?`視察者: ${esc(r.scout)}`:''}</div>${linked?`<div style="margin-top:6px;padding:5px 8px;background:var(--bg2);border-radius:5px;border-left:3px solid var(--green);font-size:11px;display:flex;align-items:center;justify-content:space-between"><span style="color:var(--txt2)"><i class="ti ti-link" style="font-size:10px"></i> ${esc(linked.name)}</span><span class="tag ${cs}" style="font-size:10px">${linked.contractExpiry?(days(linked.contractExpiry)<0?'期限切れ':days(linked.contractExpiry)+'日'):'未登録'}</span></div>`:''}</div>`;}).join('')}</div>`:`<div class="empty"><i class="ti ti-user-search"></i><p>選手レポートがありません</p></div>`}`;
 }
 function rMatchReports(){
   const all=DB.get('matchreports');
@@ -415,6 +444,24 @@ function viewMatchReport(id){
   const ap=allAway.filter(p=>!p.bench);
   const ev=r.playerEvals||[];
   const gev=(name,team)=>ev.find(e=>e.name===name&&e.team===team)||{};
+  const norm=s=>(s||'').replace(/\s+/g,'').toLowerCase();
+  const scoutingAll=DB.get('scouting');
+  const getScouting=name=>scoutingAll.find(s=>norm(s.playerName)===norm(name));
+  const scoutTagCol={有力選手:'green',継続監視:'orange',契約打診:'teal',獲得推奨:'green',見送り:'red'};
+  const scoutInfo=p=>{
+    const s=getScouting(p.name);
+    if(!s)return'';
+    const col=scoutTagCol[s.scoutStatus]||'gray';
+    return`<div style="margin-top:5px;padding:6px 8px;background:var(--bg2);border-radius:5px;border-left:3px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span class="tag ${col}" style="font-size:10px">${esc(s.scoutStatus||'—')}</span>
+        <span style="font-size:10px;color:var(--txt3)">選手レポートあり</span>
+      </div>
+      ${s.strengths?`<div style="font-size:10px;color:var(--txt2)"><span style="color:var(--green);font-weight:600">強み</span> ${esc(s.strengths)}</div>`:''}
+      ${s.weaknesses?`<div style="font-size:10px;color:var(--txt2)"><span style="color:#E24B4A;font-weight:600">課題</span> ${esc(s.weaknesses)}</div>`:''}
+      ${s.notes?`<div style="font-size:10px;color:var(--txt3);margin-top:2px">${esc(s.notes)}</div>`:''}
+    </div>`;
+  };
   const hCoords=FCOORDS_HOME[r.homeFormation]||FCOORDS_HOME['4-4-2'];
   const aCoords=FCOORDS_AWAY[r.awayFormation]||FCOORDS_AWAY['4-4-2'];
   let dots='';
@@ -456,7 +503,7 @@ function viewMatchReport(id){
     ${players.filter(p=>!p.bench).map(p=>{const e=gev(p.name,team);return`<div class="eval-row">
       <div style="font-size:11px;font-weight:600;color:${color};text-align:center">${p.num||''}</div>
       <div style="font-size:10px;font-weight:500;color:${color};background:${color}15;border-radius:3px;text-align:center;padding:1px">${esc(p.position||p.pos||'')}</div>
-      <div><div style="font-size:12px;font-weight:500">${esc(p.name||'—')}</div><div style="font-size:10px;color:var(--txt2)">${[p.club,p.age].filter(Boolean).join(' / ')}</div>${e.notes?`<div style="font-size:10px;color:var(--txt3);font-style:italic">${esc(e.notes)}</div>`:''}</div>
+      <div><div style="font-size:12px;font-weight:500">${esc(p.name||'—')}</div><div style="font-size:10px;color:var(--txt2)">${[p.club,p.age].filter(Boolean).join(' / ')}</div>${e.notes?`<div style="font-size:10px;color:var(--txt3);font-style:italic">${esc(e.notes)}</div>`:''}${scoutInfo(p)}</div>
       <div style="text-align:center;font-size:12px;font-weight:500">${p.height?p.height+'cm':'—'}</div>
       <div style="text-align:center;font-size:12px;font-weight:500">${p.weight?p.weight+'kg':'—'}</div>
     </div>`}).join('')}
@@ -464,7 +511,7 @@ function viewMatchReport(id){
     ${players.filter(p=>p.bench).map(p=>{const e=gev(p.name,team);return`<div class="eval-row" style="opacity:.75">
       <div style="font-size:11px;font-weight:600;color:${color};text-align:center">${p.num||''}</div>
       <div style="font-size:10px;font-weight:500;color:${color};border:1px dashed ${color};border-radius:3px;text-align:center;padding:1px">${esc(p.position||p.pos||'')}</div>
-      <div><div style="font-size:12px;font-weight:500">${esc(p.name||'—')}</div><div style="font-size:10px;color:var(--txt2)">${[p.club,p.age].filter(Boolean).join(' / ')}</div>${e.notes?`<div style="font-size:10px;color:var(--txt3);font-style:italic">${esc(e.notes)}</div>`:''}</div>
+      <div><div style="font-size:12px;font-weight:500">${esc(p.name||'—')}</div><div style="font-size:10px;color:var(--txt2)">${[p.club,p.age].filter(Boolean).join(' / ')}</div>${e.notes?`<div style="font-size:10px;color:var(--txt3);font-style:italic">${esc(e.notes)}</div>`:''}${scoutInfo(p)}</div>
       <div style="text-align:center;font-size:12px;font-weight:500">${p.height?p.height+'cm':'—'}</div>
       <div style="text-align:center;font-size:12px;font-weight:500">${p.weight?p.weight+'kg':'—'}</div>
     </div>`}).join('')}`;
@@ -978,7 +1025,13 @@ function getMatchMemos(playerName){
 function reportForm(r={}){
   const memos=getMatchMemos(r.playerName);
   const memosHtml=memos.length?`<div style="margin-top:16px"><div style="font-size:11px;font-weight:600;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:8px">試合メモ履歴（${memos.length}件）</div>${memos.map(m=>`<div style="padding:8px 10px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;border-left:3px solid var(--green)"><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">${fmt(m.date)} — ${esc(m.home||'—')} vs ${esc(m.away||'—')}</div><div style="font-size:12px;color:var(--txt)">${esc(m.notes)}</div></div>`).join('')}</div>`:'';
-  return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('playerName','選手名',r.playerName)}${f('teamName','チーム名',r.teamName)}</div>${f('scout','視察者',r.scout)}<div class="form-row"><label>ポジション（最大3つ）</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${[0,1,2].map(i=>`<input type="text" name="pos${i}" value="${esc((r.positions||[])[i]||'')}" placeholder="ポジション${i+1}" style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none">`).join('')}</div></div><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:12px"><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">生年月日</label><input type="date" name="birthdate" value="${r.birthdate||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">年齢</label><input type="number" name="age" value="${r.age||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">学年</label><input type="text" name="grade" value="${r.grade||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">身長 (cm)</label><input type="number" name="height" value="${r.height||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">体重 (kg)</label><input type="number" name="weight" value="${r.weight||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div>${fs('scoutStatus','ステータス',[['','未設定'],['有力選手','有力選手'],['継続監視','継続監視'],['契約打診','契約打診'],['獲得推奨','獲得推奨'],['見送り','見送り']],r.scoutStatus||'')}${ft('notes','メモ',r.notes)}${ft('strengths','強み',r.strengths)}${ft('weaknesses','課題',r.weaknesses)}${memosHtml}</form>`;}
+  const players=DB.get('players');
+  const linkedPlayer=r.linkedPlayerId?players.find(p=>p.id===r.linkedPlayerId):null;
+  const linkedHtml=linkedPlayer?`<div style="margin-top:6px;padding:8px 10px;background:var(--bg2);border-radius:var(--r);border-left:3px solid var(--green);font-size:11px;color:var(--txt2)">
+    <div style="font-weight:600;color:var(--txt);margin-bottom:2px">${esc(linkedPlayer.name)}</div>
+    <div>${esc(linkedPlayer.currentClub||'—')} / 契約期限: <span class="tag ${ccol(linkedPlayer.contractExpiry)}" style="font-size:10px">${linkedPlayer.contractExpiry?fmt(linkedPlayer.contractExpiry):'未登録'}</span></div>
+  </div>`:'';
+  return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('playerName','選手名',r.playerName)}${f('teamName','チーム名',r.teamName)}</div>${f('scout','視察者',r.scout)}<div class="form-row"><label>弊社契約と紐付け</label><select name="linkedPlayerId"><option value="">紐付けなし</option>${players.map(p=>`<option value="${p.id}" ${r.linkedPlayerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>${linkedHtml}</div><div class="form-row"><label>ポジション（最大3つ）</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${[0,1,2].map(i=>`<input type="text" name="pos${i}" value="${esc((r.positions||[])[i]||'')}" placeholder="ポジション${i+1}" style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none">`).join('')}</div></div><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:12px"><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">生年月日</label><input type="date" name="birthdate" value="${r.birthdate||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">年齢</label><input type="number" name="age" value="${r.age||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">学年</label><input type="text" name="grade" value="${r.grade||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">身長 (cm)</label><input type="number" name="height" value="${r.height||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">体重 (kg)</label><input type="number" name="weight" value="${r.weight||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div>${fs('scoutStatus','ステータス',[['','未設定'],['有力選手','有力選手'],['継続監視','継続監視'],['契約打診','契約打診'],['獲得推奨','獲得推奨'],['見送り','見送り']],r.scoutStatus||'')}${ft('notes','メモ',r.notes)}${ft('strengths','強み',r.strengths)}${ft('weaknesses','課題',r.weaknesses)}${memosHtml}</form>`;}
 function reminderForm(r={}){return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('title','タイトル *',r.title)}${fs('type','種別',[['ContractRenewal','契約更新'],['Birthday','誕生日'],['MeetingFollowup','会食フォロー'],['Other','その他']],r.type||'Other')}</div>${f('playerName','選手名',r.playerName)}${f('dueDate','期日 *',r.dueDate,'date')}${ft('notes','メモ',r.notes)}</form>`}
 function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}</form>`}
 document.addEventListener("DOMContentLoaded",()=>DB.load().then(()=>{
