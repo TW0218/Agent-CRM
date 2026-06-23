@@ -1190,6 +1190,8 @@ async function previewContractPDF(id,idx){
     overlay.innerHTML=`<div style="width:100%;max-width:860px;height:90vh;display:flex;flex-direction:column;background:var(--bg);border-radius:var(--rl);overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border2);flex-shrink:0"><span style="font-size:13px;font-weight:600">PDFプレビュー</span><button onclick="this.closest('div[style*=fixed]').remove();URL.revokeObjectURL('${url}')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--txt2);line-height:1">×</button></div><iframe src="${url}" style="flex:1;width:100%;border:none"></iframe></div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();URL.revokeObjectURL(url);}});
+    const onKey=e=>{if(e.key==='Escape'){overlay.remove();URL.revokeObjectURL(url);document.removeEventListener('keydown',onKey);}};
+    document.addEventListener('keydown',onKey);
   }catch(e){alert('プレビューに失敗しました');}
   finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i>';}}
 }
