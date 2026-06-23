@@ -251,9 +251,9 @@ const DB={
   },
   async load(){
     try{
-      const r=await fetch(SURL+'/rest/v1/crm_data?select=key,value',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}});
+      const r=await fetch(SURL+'/rest/v1/crm_data?select=key,value&key=not.like.contract_pdf_%25',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}});
       const rows=await r.json();
-      if(Array.isArray(rows))rows.forEach(row=>{if(!row.key.startsWith('contract_pdf_'))_cache[row.key]=row.value||[];});
+      if(Array.isArray(rows))rows.forEach(row=>{_cache[row.key]=row.value||[];});
     }catch(e){console.error('DB.load error',e);}
   },
   async fetchOne(k){
