@@ -926,7 +926,7 @@ function rReminders(){
 function rContracts(){
   let data=DB.get('contracts');
   if(S.search)data=data.filter(c=>c.clubName?.toLowerCase().includes(S.search)||c.playerName?.toLowerCase().includes(S.search));
-  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th><th>契約書</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td><td onclick="event.stopPropagation()">${c.hasPdf?`<div style="display:flex;gap:4px"><button class="btn" style="font-size:11px;padding:4px 8px" onclick="previewContractPDF('${c.id}')"><i class="ti ti-eye"></i></button><button class="btn" style="font-size:11px;padding:4px 8px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i></button><button class="btn danger" style="font-size:11px;padding:4px 8px" onclick="deleteContractPDF('${c.id}')"><i class="ti ti-trash"></i></button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
+  return data.length?`<table><thead><tr><th>選手</th><th>クラブ</th><th>種別</th><th>締結日</th><th>満了日</th><th>残日数</th><th>契約書</th></tr></thead><tbody>${data.map(c=>{const d=days(c.expiryDate);const cpdfs=_getContractPdfs(c);return`<tr style="cursor:pointer" onclick="editRecord('contracts','${c.id}')"><td style="font-weight:500">${esc(c.playerName||'—')}</td><td>${esc(c.clubName)}</td><td><span class="tag gray">${esc(c.contractType||'—')}</span></td><td style="font-size:11px">${fmt(c.signedDate)}</td><td style="font-size:11px">${fmt(c.expiryDate)}</td><td>${d!==null?`<span class="tag ${ccol(c.expiryDate)}">${d<0?'期限切れ':d+'日'}</span>`:'—'}</td><td onclick="event.stopPropagation()">${cpdfs.length?`<div style="display:flex;flex-direction:column;gap:3px">${cpdfs.map(p=>`<div style="display:flex;gap:3px;align-items:center"><span style="font-size:10px;color:var(--txt2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${esc(p.name)}</span><button class="btn" style="font-size:10px;padding:3px 6px" onclick="previewContractPDF('${c.id}','${p.idx}')"><i class="ti ti-eye"></i></button><button class="btn" style="font-size:10px;padding:3px 6px" onclick="downloadContractPDF('${c.id}','${esc(p.name)}','${p.idx}')"><i class="ti ti-download"></i></button><button class="btn danger" style="font-size:10px;padding:3px 6px" onclick="deleteContractPDF('${c.id}','${p.idx}')"><i class="ti ti-trash"></i></button></div>`).join('')}</div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty"><i class="ti ti-file-text"></i><p>契約が登録されていません</p></div>`;
 }
 function rSchedule(){
   const schData=DB.getObj('schedule');
@@ -1131,41 +1131,50 @@ function showModal(title,formHtml,onSave,onDelete){
   window._md=onDelete;
 }
 function closeModal(){document.getElementById('modal-root').innerHTML='';renderContent();}
-async function _fetchPDFBlob(id){
-  const rec=await DB.fetchOne('contract_pdf_'+id);
+function _getContractPdfs(c){return c.pdfs||(c.hasPdf?[{name:c.pdfName||'contract.pdf',idx:'legacy'}]:[]);}
+function _pdfKey(contractId,idx){return idx==='legacy'?'contract_pdf_'+contractId:'contract_pdf_'+contractId+'_'+idx;}
+function _nextPdfIdx(pdfs){const nums=pdfs.filter(p=>p.idx!=='legacy').map(p=>Number(p.idx));for(let i=0;i<5;i++){if(!nums.includes(i))return i;}return null;}
+async function _fetchPDFBlob(contractId,idx){
+  const rec=await DB.fetchOne(_pdfKey(contractId,idx));
   if(!rec||!rec.data)throw new Error('not found');
   const b64=rec.data.split(',')[1];
   const bin=atob(b64);const bytes=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   return{blob:new Blob([bytes],{type:'application/pdf'}),dataUrl:rec.data};
 }
-async function downloadContractPDF(id,name){
+async function downloadContractPDF(id,name,idx){
   const btn=event.target.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
   try{
-    const{blob}=await _fetchPDFBlob(id);
+    const{blob}=await _fetchPDFBlob(id,idx);
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=name||'contract.pdf';a.click();
     setTimeout(()=>URL.revokeObjectURL(url),10000);
   }catch(e){alert('ダウンロードに失敗しました');}
-  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-download"></i> ダウンロード';}}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-download"></i>';}}
 }
-async function deleteContractPDF(id){
-  if(!confirm('この契約書PDFを削除しますか？'))return;
+async function deleteContractPDF(id,idx){
+  if(!confirm('このPDFを削除しますか？'))return;
   const recs=DB.get('contracts');
   const i=recs.findIndex(r=>r.id===id);
-  if(i>=0){delete recs[i].hasPdf;delete recs[i].pdfName;DB.set('contracts',recs);}
-  DB.set('contract_pdf_'+id,null);
+  if(i>=0){
+    const pdfs=_getContractPdfs(recs[i]);
+    const remaining=pdfs.filter(p=>String(p.idx)!==String(idx));
+    if(remaining.length===0){delete recs[i].pdfs;delete recs[i].hasPdf;delete recs[i].pdfName;}
+    else recs[i].pdfs=remaining;
+    DB.set('contracts',recs);
+  }
+  DB.set(_pdfKey(id,idx),null);
   renderContent();
 }
-async function previewContractPDF(id){
+async function previewContractPDF(id,idx){
   const btn=event.target.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
   try{
-    const{blob}=await _fetchPDFBlob(id);
+    const{blob}=await _fetchPDFBlob(id,idx);
     const url=URL.createObjectURL(blob);
     window.open(url,'_blank');
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){alert('プレビューに失敗しました');}
-  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i> プレビュー';}}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i>';}}
 }
 function submitForm(){
   const form=document.getElementById('modal-root').querySelector('form');
@@ -1189,11 +1198,23 @@ function saveRecord(type,data){
   if(type==='players'){data.positions=[data.ppos0,data.ppos1,data.ppos2].filter(Boolean);data.position=data.positions[0]||'';delete data.ppos0;delete data.ppos1;delete data.ppos2;}
   const pdfData=data.pdfData;const pdfName=data.pdfName;delete data.pdfData;delete data.pdfName;
   const recs=DB.get(type);
-  let id;
-  if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0){if(pdfData){recs[i].hasPdf=true;recs[i].pdfName=pdfName;}recs[i]={...recs[i],...data,id:data._id};delete recs[i]._id;id=data._id;}else{id=DB.id();recs.push({...data,id,hasPdf:!!pdfData,pdfName:pdfName||undefined});}}
-  else{id=DB.id();recs.push({...data,id,hasPdf:!!pdfData,pdfName:pdfName||undefined});}
+  let id;let newPdfIdx=null;
+  if(data._id){
+    const i=recs.findIndex(r=>r.id===data._id);
+    if(i>=0){
+      if(pdfData){
+        const existingPdfs=_getContractPdfs(recs[i]);
+        newPdfIdx=_nextPdfIdx(existingPdfs);
+        if(newPdfIdx!==null){
+          if(recs[i].hasPdf&&!recs[i].pdfs){recs[i].pdfs=[{name:recs[i].pdfName||'contract.pdf',idx:'legacy'}];delete recs[i].hasPdf;delete recs[i].pdfName;}
+          recs[i].pdfs=[...(recs[i].pdfs||[]),{name:pdfName,idx:newPdfIdx}];
+        }
+      }
+      recs[i]={...recs[i],...data,id:data._id};delete recs[i]._id;id=data._id;
+    }else{id=DB.id();newPdfIdx=0;recs.push({...data,id,pdfs:pdfData?[{name:pdfName,idx:0}]:[]});}
+  }else{id=DB.id();newPdfIdx=0;recs.push({...data,id,pdfs:pdfData?[{name:pdfName,idx:0}]:[]});}
   DB.set(type,recs);
-  if(pdfData)DB.set('contract_pdf_'+id,{name:pdfName,data:pdfData});
+  if(pdfData&&newPdfIdx!==null)DB.set('contract_pdf_'+id+'_'+newPdfIdx,{name:pdfName,data:pdfData});
 }
 function saveMR(data){
   const hp=[],ap=[],ev=[];
@@ -1325,7 +1346,7 @@ function reportForm(r={}){
   </div>`:'';
   return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('playerName','選手名',r.playerName)}${f('teamName','チーム名',r.teamName)}</div>${f('scout','視察者',r.scout)}<div class="form-row"><label>弊社契約と紐付け</label><select name="linkedPlayerId"><option value="">紐付けなし</option>${players.map(p=>`<option value="${p.id}" ${r.linkedPlayerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>${linkedHtml}</div><div class="form-row"><label>ポジション（最大3つ）</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${[0,1,2].map(i=>`<input type="text" name="pos${i}" value="${esc((r.positions||[])[i]||'')}" placeholder="ポジション${i+1}" style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none">`).join('')}</div></div><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:12px"><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">生年月日</label><input type="date" name="birthdate" value="${r.birthdate||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">年齢</label><input type="number" name="age" value="${r.age||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row" style="margin:0"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">学年</label><input type="text" name="grade" value="${r.grade||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">身長 (cm)</label><input type="number" name="height" value="${r.height||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div><div class="form-row"><label style="font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;display:block">体重 (kg)</label><input type="number" name="weight" value="${r.weight||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--txt);outline:none"></div></div>${fs('scoutStatus','ステータス',[['','未設定'],['有力選手','有力選手'],['継続監視','継続監視'],['契約打診','契約打診'],['獲得推奨','獲得推奨'],['見送り','見送り']],r.scoutStatus||'')}${ft('notes','メモ',r.notes)}${ft('strengths','強み',r.strengths)}${ft('weaknesses','課題',r.weaknesses)}${memosHtml}</form>`;}
 function reminderForm(r={}){return`<form><input type="hidden" name="_id" value="${r.id||''}"><div class="form-cols">${f('title','タイトル *',r.title)}${fs('type','種別',[['ContractRenewal','契約更新'],['Birthday','誕生日'],['MeetingFollowup','会食フォロー'],['Other','その他']],r.type||'Other')}</div>${f('playerName','選手名',r.playerName)}${f('dueDate','期日 *',r.dueDate,'date')}${ft('notes','メモ',r.notes)}</form>`}
-function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}<div class="form-row"><label>契約書 (PDF)</label><div style="display:flex;flex-direction:column;gap:6px">${c.hasPdf?`<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt2)"><i class="ti ti-file-text" style="color:var(--green)"></i><span style="word-break:break-all">${esc(c.pdfName||'contract.pdf')}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px"><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="previewContractPDF('${c.id}')"><i class="ti ti-eye"></i> プレビュー</button><button type="button" class="btn" style="font-size:11px;padding:4px 10px" onclick="downloadContractPDF('${c.id}','${esc(c.pdfName||'contract.pdf')}')"><i class="ti ti-download"></i> ダウンロード</button><button type="button" class="btn danger" style="font-size:11px;padding:4px 10px" onclick="deleteContractPDF('${c.id}')"><i class="ti ti-trash"></i> 削除</button></div></div>`:''}<input type="file" name="pdfFile" accept="application/pdf" style="font-size:13px"></div></div></form>`}
+function contractForm(c={}){const pl=DB.get('players');return`<form><input type="hidden" name="_id" value="${c.id||''}"><div class="form-row"><label>選手</label><select name="playerName"><option value="">選択</option>${pl.map(p=>`<option value="${esc(p.name)}" ${c.playerName===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${f('clubName','クラブ / 相手先 *',c.clubName)}${fs('contractType','契約種別',[['Player-Agent','Player-Agent'],['Club-Agent','Club-Agent'],['Employment','Employment'],['Representation','Representation']],c.contractType||'Player-Agent')}<div class="form-cols">${f('signedDate','締結日',c.signedDate,'date')}${f('expiryDate','満了日',c.expiryDate,'date')}</div>${f('salary','報酬 (¥)',c.salary,'number')}${ft('notes','メモ',c.notes)}<div class="form-row"><label>契約書 PDF（最大5件）</label><div style="display:flex;flex-direction:column;gap:6px">${(()=>{const pdfs=_getContractPdfs(c);return`${pdfs.map(p=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg2);border-radius:var(--r)"><i class="ti ti-file-text" style="color:var(--green);flex-shrink:0"></i><span style="flex:1;font-size:12px;word-break:break-all;overflow:hidden">${esc(p.name)}</span><button type="button" class="btn" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="previewContractPDF('${c.id}','${p.idx}')"><i class="ti ti-eye"></i></button><button type="button" class="btn" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="downloadContractPDF('${c.id}','${esc(p.name)}','${p.idx}')"><i class="ti ti-download"></i></button><button type="button" class="btn danger" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="deleteContractPDF('${c.id}','${p.idx}')"><i class="ti ti-trash"></i></button></div>`).join('')}${pdfs.length<5?`<div><input type="file" name="pdfFile" accept="application/pdf" style="font-size:13px"><div style="font-size:11px;color:var(--txt3);margin-top:4px">${pdfs.length}/5件使用中</div></div>`:``}`;})()}</div></div></form>`}
 document.addEventListener("DOMContentLoaded",()=>DB.load().then(()=>{
   // migrate: remove deprecated fields from scouting records
   const sc=DB.get('scouting');
