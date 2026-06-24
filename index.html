@@ -767,8 +767,8 @@ function matchReportForm(r={}){
     <div class="upload-zone" onclick="document.getElementById('sheet-upload').click()">
       <i class="ti ti-photo-scan" style="font-size:24px;color:var(--green-dim);display:block;margin-bottom:6px"></i>
       <div style="font-size:13px;font-weight:500;margin-bottom:3px">メンバー表をアップロード（AI自動入力）</div>
-      <div style="font-size:11px;color:var(--txt2)">クリックまたはドラッグ＆ドロップ</div>
-      <input type="file" id="sheet-upload" accept="image/*" style="display:none" onchange="handleSheetFile(this.files[0])">
+      <div style="font-size:11px;color:var(--txt2)">画像・PDF対応 / クリックまたはドラッグ＆ドロップ</div>
+      <input type="file" id="sheet-upload" accept="image/*,application/pdf" style="display:none" onchange="handleSheetFile(this.files[0])">
     </div>
     <div class="form-cols"><div class="form-row"><label>ホームチーム *</label><input name="homeTeam" value="${esc(r.homeTeam||'')}"></div><div class="form-row"><label>アウェイチーム *</label><input name="awayTeam" value="${esc(r.awayTeam||'')}"></div></div>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:8px"><input name="homeScore" type="number" min="0" value="${r.homeScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#185FA5"><div style="font-size:14px;color:var(--txt3);font-weight:600">-</div><input name="awayScore" type="number" min="0" value="${r.awayScore??''}" placeholder="0" style="text-align:center;font-size:22px;font-weight:700;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:#E24B4A"></div>
