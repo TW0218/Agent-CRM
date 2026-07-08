@@ -1,0 +1,188 @@
+[
+  {
+    "id": "mq7jq480rzj1",
+    "age": "22",
+    "date": "2026-06-10",
+    "grade": "4",
+    "notes": "現時点ではアポローチNG",
+    "scout": "石川",
+    "height": "181",
+    "weight": "72",
+    "teamName": "早稲田大学",
+    "birthdate": "2004-04-08",
+    "positions": [
+      "DMF"
+    ],
+    "scoutName": "渡部",
+    "strengths": "",
+    "playerName": "鈴木大翔",
+    "weaknesses": "",
+    "scoutStatus": "継続監視",
+    "recommendation": "Monitor"
+  },
+  {
+    "id": "mq91efh14qpq",
+    "age": "22",
+    "grade": "4",
+    "notes": "現時点ではアポローチNG",
+    "scout": "石川",
+    "height": "174",
+    "weight": "70",
+    "teamName": "早稲田大学",
+    "birthdate": "2004-04-13",
+    "positions": [
+      "OMF"
+    ],
+    "strengths": "",
+    "playerName": "柏木陽良",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq91ixkdicqk",
+    "age": "21",
+    "grade": "4",
+    "notes": "監督に話はついていて、７月にアプローチ予定\n清水内定。",
+    "scout": "石川",
+    "height": "180",
+    "weight": "76",
+    "teamName": "京都産業大学",
+    "birthdate": "2004-12-01",
+    "positions": [
+      "CB"
+    ],
+    "strengths": "",
+    "playerName": "小野成夢",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq91lat5op7g",
+    "age": "21",
+    "grade": "4",
+    "notes": "監督に話はついていて、７月にアプローチ予定\n徳島内定。",
+    "scout": "石川",
+    "height": "172",
+    "weight": "70",
+    "teamName": "京都産業大学",
+    "birthdate": "2005-03-18",
+    "positions": [
+      "OMF"
+    ],
+    "strengths": "",
+    "playerName": "伊藤翼",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq91nv5w1z4e",
+    "age": "20",
+    "grade": "2",
+    "notes": "U-21\n監督に紹介をして貰い済なので、今後もアプローチをします。",
+    "scout": "石川",
+    "height": "180",
+    "weight": "73",
+    "teamName": "中京大学",
+    "birthdate": "2006-04-15",
+    "positions": [
+      "DMF"
+    ],
+    "strengths": "",
+    "playerName": "岩本悠庵",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq91ragrz36k",
+    "age": "21",
+    "grade": "3",
+    "notes": "監督に紹介をして貰い済なので、今後もアプローチをします。",
+    "scout": "石川",
+    "height": "183",
+    "weight": "78",
+    "teamName": "中京大学",
+    "birthdate": "2005-11-25",
+    "positions": [
+      "CB"
+    ],
+    "strengths": "",
+    "playerName": "那須琳斗",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq98mw682f72",
+    "age": "16",
+    "grade": "2",
+    "notes": "まだアプローチする段階ではないが、帝京長岡・谷口哲朗総監督の連絡先はあり。\n運動量豊富な泥臭い系ストライカー。前線からの守備◎。",
+    "scout": "渡部",
+    "height": "175",
+    "weight": "67",
+    "teamName": "帝京長岡",
+    "birthdate": "2010-01-17",
+    "positions": [
+      "FW"
+    ],
+    "strengths": "",
+    "playerName": "児山 雅稀",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq98vab0nc3h",
+    "age": "19",
+    "grade": "1",
+    "notes": "1年生のレフティーWG。足元技術あってスピードあり。\nアプローチ段階ではなく、継続的に視察していく。",
+    "scout": "渡部",
+    "height": "180",
+    "weight": "70",
+    "teamName": "日体大",
+    "birthdate": "2007-05-23",
+    "positions": [
+      "WG"
+    ],
+    "strengths": "",
+    "playerName": "佐々木 雄基",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mq98z2csm6hn",
+    "age": "20",
+    "grade": "3",
+    "notes": "足元の技術◎ とにかくキックがうまい。バックパスを受けても一切ばたつかず、ビルドアップできる。\nGKとしての守備については今後も継続的に視察するが、6月に横浜FCの内定が出たばかり。",
+    "scout": "渡部",
+    "height": "185",
+    "weight": "80",
+    "teamName": "日体大",
+    "birthdate": "2005-06-15",
+    "positions": [
+      "GK"
+    ],
+    "strengths": "",
+    "playerName": "原田 真透",
+    "weaknesses": "",
+    "scoutStatus": "継続監視"
+  },
+  {
+    "id": "mqojuneuoyiy",
+    "_id": "",
+    "age": "20",
+    "grade": "3",
+    "notes": "",
+    "scout": "石川",
+    "hasPdf": false,
+    "height": "176",
+    "weight": "68",
+    "teamName": "日体大",
+    "birthdate": "",
+    "positions": [
+      "MF"
+    ],
+    "strengths": "",
+    "playerName": "片野拓久",
+    "weaknesses": "",
+    "scoutStatus": "獲得推奨",
+    "linkedPlayerId": ""
+  }
+]
