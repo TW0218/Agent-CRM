@@ -157,6 +157,8 @@ tr:last-child td{border-bottom:none}
   th,td{padding:7px 8px}
   .eval-row{grid-template-columns:24px 18px 1fr 34px 34px;font-size:11px}
   .mobile-nav{display:flex!important}
+  /* iOS Safari auto-zoom防止: font-size<16pxのinputはズームが発動するため16pxに上書き */
+  input,select,textarea{font-size:16px!important}
 }
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid rgba(255,255,255,0.1);z-index:100;height:84px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:none}
 .mobile-nav::-webkit-scrollbar{display:none}
@@ -546,6 +548,7 @@ function viewMatchReport(id){
       <button class="tab-btn" id="tb-away" onclick="swTab('away',this)"><i class="ti ti-users"></i> ${esc(r.awayTeam)}（${allAway.length}名）</button>
       <button class="tab-btn" id="tb-notes" onclick="swTab('notes',this)"><i class="ti ti-pencil"></i> メモ</button>
       <button class="tab-btn" id="tb-memo" onclick="swTab('memo',this)"><i class="ti ti-notes"></i> 総評</button>
+      ${r.officialPdfName?`<button class="tab-btn" id="tb-official" onclick="swTab('official',this)"><i class="ti ti-file-text"></i> 公式記録</button>`:''}
     </div>
     <div id="tp-pitch">
       ${pitchHtml}
@@ -581,6 +584,7 @@ function viewMatchReport(id){
       </div>
     </div>
     <div id="tp-memo"><div style="font-size:13px;line-height:1.8;white-space:pre-wrap">${esc(r.matchNotes||'総評メモなし')}</div></div>
+    ${r.officialPdfName?`<div id="tp-official" style="display:none"><div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)"><i class="ti ti-file-text" style="font-size:24px;color:var(--green)"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(r.officialPdfName)}</div><div style="font-size:11px;color:var(--txt3)">公式記録PDF</div></div><button class="btn primary" onclick="previewMRPDF('${id}')"><i class="ti ti-eye"></i> プレビュー</button></div></div>`:''}
   </div></div>`;
 }
 
@@ -706,7 +710,7 @@ function saveTeamNotes(id){
   if(btn){btn.innerHTML='<i class="ti ti-check"></i> 保存完了';setTimeout(()=>{btn.innerHTML='<i class="ti ti-device-floppy"></i> メモを保存';},1500);}
 }
 function swTab(tab,btn){
-  ['pitch','home','away','notes','memo'].forEach(t=>{
+  ['pitch','home','away','notes','memo','official'].forEach(t=>{
     const el=document.getElementById('tp-'+t);
     const b=document.getElementById('tb-'+t);
     if(el)el.style.display=t===tab?'':'none';
@@ -790,6 +794,14 @@ function matchReportForm(r={}){
       ${pRows(ap,'a','#E24B4A','アウェイ メンバー（最大11名）')}
     </div>
     <div class="form-row"><label>総評メモ</label><textarea name="matchNotes">${esc(r.matchNotes||'')}</textarea></div>
+    <div class="form-row"><label>公式記録 PDF</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${r.officialPdfName?`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg2);border-radius:var(--r)"><i class="ti ti-file-text" style="color:var(--green);flex-shrink:0"></i><span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.officialPdfName)}</span><button type="button" class="btn" style="font-size:11px;padding:3px 8px" onclick="previewMRPDF('${r.id}')"><i class="ti ti-eye"></i> 確認</button><button type="button" class="btn danger" style="font-size:11px;padding:3px 8px" onclick="deleteMRPDF('${r.id}')"><i class="ti ti-trash"></i></button></div>`:``}
+        ${!r.officialPdfName?`<input type="file" id="mr-official-pdf" accept="application/pdf" style="font-size:13px" onchange="(f=>{if(!f)return;const rd=new FileReader();rd.onload=e=>{document.getElementById('mr-official-pdf-data').value=e.target.result;document.getElementById('mr-official-pdf-name').value=f.name;};rd.readAsDataURL(f);})(this.files[0])"><div style="font-size:11px;color:var(--txt3);margin-top:2px">PDFファイルを選択</div>`:``}
+        <input type="hidden" id="mr-official-pdf-data" name="officialPdfData" value="">
+        <input type="hidden" id="mr-official-pdf-name" name="officialPdfName" value="">
+      </div>
+    </div>
   </form>`;
 }
 function buildPlayerKnowledge(){
@@ -1195,6 +1207,7 @@ async function previewContractPDF(id,idx){
   }catch(e){alert('プレビューに失敗しました');}
   finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i>';}}
 }
+function resetIOSZoom(){const v=document.querySelector('meta[name="viewport"]');if(!v)return;v.setAttribute('content','width=device-width,initial-scale=1.0,maximum-scale=1.0');setTimeout(()=>v.setAttribute('content','width=device-width,initial-scale=1.0'),100);}
 function submitForm(){
   const form=document.getElementById('modal-root').querySelector('form');
   if(!form)return;
@@ -1207,13 +1220,13 @@ function submitForm(){
     const existingPdfs=data._id?_getContractPdfs((DB.get('contracts')||[]).find(r=>r.id===data._id)||{}):[];
     const slots=5-existingPdfs.length;
     const targets=files.slice(0,Math.max(0,slots));
-    if(targets.length===0){window._ms&&window._ms(data);closeModal();return;}
+    if(targets.length===0){resetIOSZoom();window._ms&&window._ms(data);closeModal();return;}
     Promise.all(targets.map(f=>new Promise(resolve=>{const rd=new FileReader();rd.onload=e=>resolve({pdfData:e.target.result,pdfName:f.name});rd.readAsDataURL(f);}))).then(pdfs=>{
       pdfs.forEach(({pdfData,pdfName})=>window._ms&&window._ms({...data,pdfData,pdfName}));
-      closeModal();
+      resetIOSZoom();closeModal();
     });
   }else{
-    window._ms&&window._ms(data);closeModal();
+    resetIOSZoom();window._ms&&window._ms(data);closeModal();
   }
 }
 function saveRecord(type,data){
@@ -1270,11 +1283,52 @@ function saveMR(data){
     gi++;
   }
   goals.sort((a,b)=>(a.minute||0)-(b.minute||0));
-  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,goals,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes};
+  const existRec=data._id?DB.get('matchreports').find(r=>r.id===data._id):null;
+  const officialPdfData=data.officialPdfData||'';
+  const officialPdfName=data.officialPdfName||'';
+  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,goals,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes,officialPdfName:officialPdfData?officialPdfName:(existRec?.officialPdfName||'')};
   const recs=DB.get('matchreports');
-  if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0)recs[i]={...rec,id:data._id};else recs.push({...rec,id:DB.id()});}
-  else recs.push({...rec,id:DB.id()});
+  let savedId;
+  if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0){recs[i]={...recs[i],...rec,id:data._id};}else recs.push({...rec,id:DB.id()});savedId=data._id;}
+  else{savedId=DB.id();recs.push({...rec,id:savedId});}
   DB.set('matchreports',recs);
+  if(officialPdfData)DB.set('matchreport_pdf_'+savedId,{name:officialPdfName,data:officialPdfData});
+}
+function _mrPdfKey(id){return'matchreport_pdf_'+id;}
+async function previewMRPDF(id){
+  const btn=event?.target?.closest('button');if(btn){btn.disabled=true;btn.textContent='取得中...';}
+  try{
+    const rec=await DB.fetchOne(_mrPdfKey(id));
+    if(!rec||!rec.data)throw new Error('not found');
+    const b64=rec.data.split(',')[1];const bin=atob(b64);const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px';
+    overlay.innerHTML=`<div style="width:100%;max-width:1200px;height:96vh;display:flex;flex-direction:column;background:var(--bg);border-radius:var(--rl);overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border2);flex-shrink:0"><span style="font-size:13px;font-weight:600">公式記録 PDF</span><button onclick="this.closest('div[style*=fixed]').remove();URL.revokeObjectURL('${url}')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--txt2);line-height:1">×</button></div><iframe src="${url}" style="flex:1;width:100%;border:none"></iframe></div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();URL.revokeObjectURL(url);}});
+    const onKey=e=>{if(e.key==='Escape'){overlay.remove();URL.revokeObjectURL(url);document.removeEventListener('keydown',onKey);}};
+    document.addEventListener('keydown',onKey);
+  }catch(e){alert('プレビューに失敗しました');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-eye"></i> 確認';}}
+}
+async function deleteMRPDF(id){
+  if(!confirm('公式記録PDFを削除しますか？'))return;
+  const recs=DB.get('matchreports');
+  const i=recs.findIndex(r=>r.id===id);
+  if(i>=0){delete recs[i].officialPdfName;DB.set('matchreports',recs);}
+  DB.set(_mrPdfKey(id),null);
+  const modal=document.getElementById('modal-root');
+  if(modal){
+    const pdfRow=modal.querySelector('[data-mr-pdf-row]');
+    if(pdfRow)pdfRow.remove();
+    const fileInput=modal.querySelector('#mr-official-pdf');
+    if(fileInput)fileInput.closest('div')&&(fileInput.closest('div').style.display='');
+  }
+  closeModal();
+  setTimeout(()=>editMatchReport(id),80);
 }
 function editRecord(type,id){
   if(type==='matchreports'){viewMatchReport(id);return;}
