@@ -39,24 +39,6 @@
     "scoutStatus": "継続監視"
   },
   {
-    "id": "mq91ixkdicqk",
-    "age": "21",
-    "grade": "4",
-    "notes": "監督に話はついていて、７月にアプローチ予定\n清水内定。",
-    "scout": "石川",
-    "height": "180",
-    "weight": "76",
-    "teamName": "京都産業大学",
-    "birthdate": "2004-12-01",
-    "positions": [
-      "CB"
-    ],
-    "strengths": "",
-    "playerName": "小野成夢",
-    "weaknesses": "",
-    "scoutStatus": "継続監視"
-  },
-  {
     "id": "mq91lat5op7g",
     "age": "21",
     "grade": "4",
@@ -132,7 +114,7 @@
     "id": "mq98vab0nc3h",
     "age": "19",
     "grade": "1",
-    "notes": "1年生のレフティーWG。足元技術あってスピードあり。\nアプローチ段階ではなく、継続的に視察していく。",
+    "notes": "1年生のレフティーWG。静学出身者らしさのある足元技術◎。\n右サイドからのカットイン型選手だけど、縦にも勝負できる。\n一方で、スピード面は秀でているようには感じない。\nアプローチ段階ではなく、継続的に視察していく。",
     "scout": "渡部",
     "height": "180",
     "weight": "70",
@@ -144,7 +126,8 @@
     "strengths": "",
     "playerName": "佐々木 雄基",
     "weaknesses": "",
-    "scoutStatus": "継続監視"
+    "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
   },
   {
     "id": "mq98z2csm6hn",
@@ -183,6 +166,155 @@
     "playerName": "片野拓久",
     "weaknesses": "",
     "scoutStatus": "獲得推奨",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "mrycw980tto1",
+    "_id": "",
+    "age": "",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "スピードとドリブルが特徴。アンリのポジショニングに近い感じで、左サイドから切り込んでシュートまでが得意の形。",
+    "scout": "渡部",
+    "height": "179",
+    "weight": "71",
+    "teamName": "米子北",
+    "birthdate": "",
+    "positions": [
+      "FW"
+    ],
+    "strengths": "",
+    "playerName": "大原暁",
+    "weaknesses": "",
+    "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "mryd54a7ewnn",
+    "age": "",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "圧倒的なスピードと加速力に、両足の繊細なタッチで緩急のあるドリブルでサイドを切り開くサイドアタッカー。",
+    "scout": "",
+    "height": "174",
+    "weight": "63",
+    "teamName": "豊川高校",
+    "birthdate": "",
+    "positions": [
+      "SH",
+      "WG"
+    ],
+    "strengths": "",
+    "playerName": "大下蒼生",
+    "weaknesses": "菅原の出身チーム、ラランジャ豊川出身。",
+    "scoutStatus": "獲得推奨",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "mryexj0kzeh0",
+    "age": "",
+    "pdfs": [],
+    "grade": "2",
+    "notes": "世代別の日本代表に選ばれ、2025年には育成プロジェクトでドイツの強豪・バイエルン・ミュンヘンへの短期留学。10番",
+    "scout": "渡部",
+    "height": "178",
+    "weight": "70",
+    "teamName": "日章学園",
+    "birthdate": "",
+    "positions": [
+      "FW"
+    ],
+    "strengths": "",
+    "playerName": "秋鷹青杜",
+    "weaknesses": "",
+    "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "ms1lspmtqut4",
+    "age": "18",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "小学2年生時にテコンドー全国優勝",
+    "scout": "渡部",
+    "height": "175",
+    "weight": "66",
+    "teamName": "大津高校",
+    "birthdate": "2008-07-08",
+    "positions": [
+      "CMF",
+      "DMF"
+    ],
+    "strengths": "右利きだが、左足も利き足同等レベルでコントロールしてパスできる。常にターンして、ワンステップでサイドチェンジもできる。加えてミスが少ない。",
+    "playerName": "芋生陵",
+    "weaknesses": "守備の強度とセカンドボール",
+    "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "ms1m4ucnt8g6",
+    "age": "18",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "元U-15日本代表",
+    "scout": "渡部",
+    "height": "177",
+    "weight": "63",
+    "teamName": "静岡学園",
+    "birthdate": "2008-04-17",
+    "positions": [
+      "WB",
+      "SB",
+      "SH"
+    ],
+    "strengths": "抜群のクロス精度。推進力あって抜き切れる。抜ききらなくてもクロスを上げる技術あり。スピードあり。チームとしてボールを奪われたときの切り替えが早く、プレー面では負けん気も強い。",
+    "playerName": "小田切颯佑",
+    "weaknesses": "",
+    "scoutStatus": "獲得推奨",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "ms5gmlmxqctx",
+    "_id": "",
+    "age": "17",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "",
+    "scout": "渡部",
+    "height": "175",
+    "weight": "65",
+    "teamName": "桐光学園",
+    "birthdate": "2008-11-08",
+    "positions": [
+      "RSB",
+      "WB"
+    ],
+    "strengths": "荒いけど圧倒的なスピード",
+    "playerName": "萩原慶",
+    "weaknesses": "",
+    "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "msk4ilbm2wdi",
+    "_id": "",
+    "age": "14",
+    "pdfs": [],
+    "grade": "3",
+    "notes": "センターバックが主戦場だが、ボランチも高い質でこなせる。足下がしっかりしていて、ターン/ハーフターンで前向いてパスを供給できる。",
+    "scout": "渡部",
+    "height": "180",
+    "weight": "73",
+    "teamName": "静岡学園",
+    "birthdate": "2009-02-18",
+    "positions": [
+      "CB",
+      "DMF"
+    ],
+    "strengths": "ビルドアップできるCB",
+    "playerName": "林奏汰",
+    "weaknesses": "対人の強度はこれから。早生まれでまだ伸びるかと。",
+    "scoutStatus": "継続監視",
     "linkedPlayerId": ""
   }
 ]
