@@ -243,6 +243,9 @@ Object.keys(FCOORDS_HOME).forEach(k=>{FCOORDS_AWAY[k]=FCOORDS_HOME[k].map(([x,y]
 
 const SURL='https://ahlnaawthjkdjbizspec.supabase.co';
 const SKEY='sb_publishable_b04LWH253h7yFLTRRefqCQ_VozK30io';
+// 注視選手の対象ステータス。scripts/update_watch_players.py がこの行を読むので、
+// 定数名と配列リテラルの形は変えないこと（中身の増減は自由）。
+const WATCH_STATUSES=['継続監視','契約打診','獲得推奨'];
 const _cache={};
 const DB={
   get(k){return _cache[k]||[]},
@@ -367,7 +370,7 @@ function rDash(){
   const teamExp180=contracts.filter(c=>c.expiryDate&&days(c.expiryDate)>=0&&days(c.expiryDate)<=180);
   const teamExp90=contracts.filter(c=>c.expiryDate&&days(c.expiryDate)>=0&&days(c.expiryDate)<=90);
   // 注視選手
-  const watchPlayers=scouting.filter(s=>s.scoutStatus==='継続監視'||s.scoutStatus==='契約打診'||s.scoutStatus==='獲得推奨');
+  const watchPlayers=scouting.filter(s=>WATCH_STATUSES.includes(s.scoutStatus));
   const urgent=reminders.filter(r=>!r.done&&new Date(r.dueDate)<=new Date());
   return`
   <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">

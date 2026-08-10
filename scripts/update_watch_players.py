@@ -2,16 +2,25 @@
 """注視選手JSON（exports/watch_players.json）を Supabase の最新データで更新する。
 
 毎週月曜 06:00 に launchd から実行される。
-  設定: ~/Library/LaunchAgents/com.tw0218.agent-crm.watchplayers.plist
   ログ: ~/Library/Logs/agent-crm-watchplayers.log
 
 手動実行:
   /usr/bin/python3 scripts/update_watch_players.py
 
-注視選手の定義は index.html のダッシュボード（watchPlayers）と揃えている。
-片方を変えたらもう片方も直すこと。
+スケジュール設定（plist）の控えは scripts/ にある。launchd は
+~/Library/LaunchAgents/ しか読まないので、実体はそちらに置く必要がある。
+新しいMacで復元する場合:
+  cp scripts/com.tw0218.agent-crm.watchplayers.plist ~/Library/LaunchAgents/
+  # plist 内の絶対パスをそのMacのリポジトリ位置に直してから
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.tw0218.agent-crm.watchplayers.plist
+Desktop配下にリポジトリを置く場合は、python3 にフルディスクアクセスの付与も要る
+（macOSがバックグラウンドプロセスからのDesktopアクセスを既定で拒否するため）。
+
+注視選手の条件は index.html の WATCH_STATUSES を読む。定義を持たないことで
+二重管理を避けている。
 """
 import json
+import plistlib
 import re
 import subprocess
 import sys
@@ -22,10 +31,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 INDEX = REPO / "index.html"
 OUT = REPO / "exports" / "watch_players.json"
+PLIST_NAME = "com.tw0218.agent-crm.watchplayers.plist"
+PLIST_REPO = REPO / "scripts" / PLIST_NAME
+PLIST_INSTALLED = Path.home() / "Library" / "LaunchAgents" / PLIST_NAME
 GIT = "/usr/bin/git"
-
-# index.html の watchPlayers と同じ条件
-WATCH_STATUSES = ("継続監視", "契約打診", "獲得推奨")
 
 
 def log(msg):
@@ -38,17 +47,49 @@ def git(*args, check=True):
     )
 
 
-def read_credentials():
-    """index.html から Supabase のエンドポイントと publishable key を読む。
+def read_index_config():
+    """index.html から接続情報と注視選手の条件を読む。
 
-    キーが更新されてもスクリプト側の修正が要らないよう、値は持たず毎回読む。
+    この3つはアプリ側が正解を持っている。スクリプトが自前の値を持つと
+    定義がズレたまま静かに動き続けるので、既定値へのフォールバックはしない。
+    読めなければ止めて、ログとexit codeで気づけるようにする。
     """
     src = INDEX.read_text(encoding="utf-8")
+
     url = re.search(r"const\s+SURL\s*=\s*'([^']+)'", src)
     key = re.search(r"const\s+SKEY\s*=\s*'([^']+)'", src)
     if not url or not key:
         raise RuntimeError("index.html から SURL / SKEY を読み取れませんでした")
-    return url.group(1), key.group(1)
+
+    arr = re.search(r"const\s+WATCH_STATUSES\s*=\s*\[([^\]]*)\]", src)
+    if not arr:
+        raise RuntimeError(
+            "index.html から WATCH_STATUSES を読み取れませんでした。"
+            "定数名か配列リテラルの形が変わっていないか確認してください"
+        )
+    statuses = [s for s in re.findall(r"'([^']*)'", arr.group(1)) if s]
+    if not statuses:
+        raise RuntimeError("WATCH_STATUSES が空です")
+
+    return url.group(1), key.group(1), statuses
+
+
+def check_schedule_drift():
+    """稼働中の実行スケジュールがリポジトリの控えと食い違っていないか見る。
+
+    plist の実体は launchd の都合で ~/Library/LaunchAgents/ に置くしかなく、
+    リポジトリの控えと二重になる。ズレを防げない以上、気づけるようにしておく。
+    絶対パスはMacごとに違うので、比較するのは実行時刻だけにする。
+    """
+    try:
+        if not (PLIST_REPO.exists() and PLIST_INSTALLED.exists()):
+            return
+        repo_sched = plistlib.loads(PLIST_REPO.read_bytes()).get("StartCalendarInterval")
+        live_sched = plistlib.loads(PLIST_INSTALLED.read_bytes()).get("StartCalendarInterval")
+        if repo_sched != live_sched:
+            log(f"警告: 実行スケジュールがリポジトリの控えと違います（控え={repo_sched} / 稼働中={live_sched}）")
+    except Exception as e:
+        log(f"警告: スケジュールの照合に失敗しました: {e}")
 
 
 def fetch_scouting(surl, skey):
@@ -117,12 +158,25 @@ def commit_and_push():
 
 def main():
     log("=== 注視選手JSONの更新を開始 ===")
-    surl, skey = read_credentials()
+    check_schedule_drift()
+
+    surl, skey, statuses = read_index_config()
+    log(f"対象ステータス: {' / '.join(statuses)}")
     all_scouting = fetch_scouting(surl, skey)
-    watch = [s for s in all_scouting if s.get("scoutStatus") in WATCH_STATUSES]
+    watch = [s for s in all_scouting if s.get("scoutStatus") in statuses]
     log(f"全レポート {len(all_scouting)}件 のうち注視選手 {len(watch)}件")
 
     old = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else []
+
+    # 条件の読み違いやSupabase側の障害で、既存のJSONを空や虚無で
+    # 上書きしてしまう事故を防ぐ。異常なら書かずに止める。
+    if old and not watch:
+        raise RuntimeError(
+            f"注視選手が0件になりました（前回{len(old)}名）。"
+            "異常の可能性があるためファイルは更新しません"
+        )
+    if old and len(watch) * 2 < len(old):
+        log(f"警告: 注視選手が半数以下に減りました（{len(old)}名 → {len(watch)}名）。内容を確認してください。")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(
