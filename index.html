@@ -432,11 +432,41 @@ function rMatchReports(){
     });
   }
   if(!data.length)return`<div class="empty"><i class="ti ti-ball-football"></i><p>試合レポートがありません</p></div>`;
-  return`<div class="cards-grid">${data.map(r=>{
-    const q2=S.search.replace(/\s+/g,'');
-    const norm=s=>(s||'').toLowerCase().replace(/\s+/g,'');
-    const matchedPlayers=S.search?[...(r.homePlayers||[]),...(r.awayPlayers||[])].filter(p=>norm(p.name).includes(q2)):[];
-    return`<div class="match-card" onclick="viewMatchReport('${r.id}')">
+  return mrTreeHtml(data);
+}
+// 高校年代を示す大会名のキーワード
+const MR_HS_COMP=['U-18','U18','U-19','高円宮杯','インターハイ','高校','プリンスリーグ','プレミアリーグ','選手権'];
+const MR_CATEGORIES=['大学','高校','未分類'];
+const MR_CAT_ICON={'大学':'ti-school','高校':'ti-backpack','未分類':'ti-help-circle'};
+// 試合レポートのカテゴリを決める。チーム名ではなく大会名を最優先にしている。
+// 「流通経済大学付属柏高校」のように大学と高校が同居する名前があり、
+// クラブユース（横浜FMユース等）はチーム名から年代を読めないため。
+function mrCategory(r){
+  if(r.category==='大学'||r.category==='高校')return r.category; // フォームでの手動指定を優先
+  const c=r.competition||'';
+  if(c.includes('大学'))return'大学';
+  if(MR_HS_COMP.some(k=>c.includes(k)))return'高校';
+  const t=(r.homeTeam||'')+' '+(r.awayTeam||'');
+  if(t.includes('高校'))return'高校'; // 「◯◯大学付属高校」を大学と誤判定しないよう先に見る
+  if(t.includes('大学'))return'大学';
+  if(t.includes('学園')||t.includes('ユース'))return'高校';
+  return'未分類';
+}
+function mrIsOpen(key,depth){
+  if(S.search)return true; // 検索中はヒットを探しに行かなくて済むよう全て開く
+  const v=(S.mrOpen||{})[key];
+  return v!==undefined?v:depth<2; // 既定はカテゴリ・年が開、月が閉
+}
+window.mrToggle=function(key,depth){
+  S.mrOpen=S.mrOpen||{};
+  S.mrOpen[key]=!mrIsOpen(key,depth);
+  renderContent();
+};
+function mrCardHtml(r){
+  const q2=S.search.replace(/\s+/g,'');
+  const norm=s=>(s||'').toLowerCase().replace(/\s+/g,'');
+  const matched=S.search?[...(r.homePlayers||[]),...(r.awayPlayers||[])].filter(p=>norm(p.name).includes(q2)):[];
+  return`<div class="match-card" onclick="viewMatchReport('${r.id}')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="tag teal">${esc(r.competition||'—')}</span><span style="font-size:11px;color:var(--txt2)">${fmt(r.date)}</span></div>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:10px 0">
       <div style="text-align:right"><div style="font-size:13px;font-weight:600">${esc(r.homeTeam||'—')}</div><div style="font-size:10px;color:var(--txt2)">${esc(r.homeFormation||'—')}</div></div>
@@ -445,8 +475,61 @@ function rMatchReports(){
     </div>
     <div style="font-size:11px;color:var(--txt2)">${esc(r.venue||'—')}</div>
     <div style="font-size:11px;color:var(--txt3);margin-top:4px">${((r.homePlayers||[]).length+(r.awayPlayers||[]).length)}名 / by ${esc(r.scoutName||'—')}</div>
-    ${matchedPlayers.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${matchedPlayers.map(p=>`<span class="tag green" style="font-size:10px">${esc(p.name)}</span>`).join('')}</div>`:''}
-  </div>`;}).join('')}`;
+    ${matched.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${matched.map(p=>`<span class="tag green" style="font-size:10px">${esc(p.name)}</span>`).join('')}</div>`:''}
+  </div>`;
+}
+function mrFolderHtml(key,depth,icon,label,count,open,inner){
+  const pad=[0,14,28][depth];
+  const fs2=[13,12,12][depth];
+  return`<div style="margin-left:${pad}px">
+    <div onclick="mrToggle('${key.replace(/'/g,"\\'")}',${depth})" style="display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:pointer;border-radius:var(--r);user-select:none" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
+      <i class="ti ti-chevron-right" style="font-size:13px;color:var(--txt3);transition:transform .15s;transform:rotate(${open?90:0}deg);flex-shrink:0"></i>
+      <i class="ti ${icon}" style="font-size:${fs2+2}px;color:var(--green);flex-shrink:0"></i>
+      <span style="font-size:${fs2}px;font-weight:${depth===0?600:500}">${esc(label)}</span>
+      <span style="font-size:10px;color:var(--txt3);background:var(--bg2);border-radius:9px;padding:1px 7px">${count}</span>
+    </div>
+    ${open?inner:''}
+  </div>`;
+}
+function mrTreeHtml(data){
+  // カテゴリ → 年 → 月 に振り分ける
+  const tree={};
+  data.forEach(r=>{
+    const cat=mrCategory(r);
+    const d=r.date?new Date(r.date):null;
+    const valid=d&&!isNaN(d.getTime());
+    const y=valid?String(d.getFullYear()):'日付なし';
+    const m=valid?d.getMonth()+1:0;
+    if(!tree[cat])tree[cat]={};
+    if(!tree[cat][y])tree[cat][y]={};
+    if(!tree[cat][y][m])tree[cat][y][m]=[];
+    tree[cat][y][m].push(r);
+  });
+  const cats=MR_CATEGORIES.filter(c=>tree[c]);
+  if(!cats.length)return`<div class="empty"><i class="ti ti-ball-football"></i><p>試合レポートがありません</p></div>`;
+  return`<div style="display:flex;flex-direction:column;gap:2px">${cats.map(cat=>{
+    const years=Object.keys(tree[cat]).sort((a,b)=>b.localeCompare(a)); // 新しい年を上に
+    const catCount=years.reduce((n,y)=>n+Object.values(tree[cat][y]).reduce((s,a)=>s+a.length,0),0);
+    const catInner=years.map(y=>{
+      const months=Object.keys(tree[cat][y]).map(Number).sort((a,b)=>b-a);
+      const yCount=months.reduce((n,m)=>n+tree[cat][y][m].length,0);
+      // 日付のないレポートは月で分けられないので、年の直下にそのまま並べる
+      const yInner=y==='日付なし'
+        ?`<div class="cards-grid" style="margin:6px 0 10px 28px">${months.map(m=>tree[cat][y][m]).flat().map(mrCardHtml).join('')}</div>`
+        :months.map(m=>{
+          const list=tree[cat][y][m].slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          const key=`${cat}/${y}/${m}`;
+          const open=mrIsOpen(key,2);
+          const inner=`<div class="cards-grid" style="margin:6px 0 10px 42px">${list.map(mrCardHtml).join('')}</div>`;
+          return mrFolderHtml(key,2,open?'ti-folder-open':'ti-folder',`${m}月`,list.length,open,inner);
+        }).join('');
+      const key=`${cat}/${y}`;
+      const open=mrIsOpen(key,1);
+      return mrFolderHtml(key,1,'ti-calendar',y==='日付なし'?y:`${y}年`,yCount,open,yInner);
+    }).join('');
+    const open=mrIsOpen(cat,0);
+    return mrFolderHtml(cat,0,MR_CAT_ICON[cat],cat,catCount,open,catInner);
+  }).join('')}</div>`;
 }
 function viewMatchReport(id){
   const r=DB.get('matchreports').find(x=>x.id===id);
@@ -787,6 +870,7 @@ function matchReportForm(r={}){
       <div id="goals-list">${(r.goals||[]).map((g,i)=>goalRowHtml(g,i,r.homeTeam,r.awayTeam)).join('')}</div>
     </div>
     <div class="form-cols"><div class="form-row"><label>大会・リーグ</label><input name="competition" value="${esc(r.competition||'')}"></div><div class="form-row"><label>会場</label><input name="venue" value="${esc(r.venue||'')}"></div></div>
+    <div class="form-row"><label>カテゴリ（一覧の振り分け先）</label><select name="category">${[['','自動判定'],['大学','大学'],['高校','高校']].map(([v,l])=>`<option value="${v}" ${(r.category||'')===v?'selected':''}>${l}</option>`).join('')}</select><div style="font-size:11px;color:var(--txt3);margin-top:3px">自動判定は大会名から行われます${r.id?`（現在の判定: ${esc(mrCategory(r))}）`:''}</div></div>
     <div class="form-cols"><div class="form-row"><label>日付</label><input name="date" type="date" value="${r.date||''}"></div><div class="form-row"><label>視察者</label><input name="scoutName" value="${esc(r.scoutName||'')}"></div></div>
     <div class="form-cols">
       <div class="form-row"><label>ホーム フォーメーション</label><select name="homeFormation">${FORMATIONS.map(f=>`<option value="${f}" ${r.homeFormation===f?'selected':''}>${f}</option>`).join('')}</select></div>
@@ -1289,7 +1373,7 @@ function saveMR(data){
   const existRec=data._id?DB.get('matchreports').find(r=>r.id===data._id):null;
   const officialPdfData=data.officialPdfData||'';
   const officialPdfName=data.officialPdfName||'';
-  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,goals,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes,officialPdfName:officialPdfData?officialPdfName:(existRec?.officialPdfName||'')};
+  const rec={homeTeam:data.homeTeam,awayTeam:data.awayTeam,homeScore:data.homeScore!==''?Number(data.homeScore):null,awayScore:data.awayScore!==''?Number(data.awayScore):null,goals,competition:data.competition,venue:data.venue,date:data.date,scoutName:data.scoutName,homeFormation:data.homeFormation,awayFormation:data.awayFormation,homePlayers:hp,awayPlayers:ap,playerEvals:ev,matchNotes:data.matchNotes,category:data.category||'',officialPdfName:officialPdfData?officialPdfName:(existRec?.officialPdfName||'')};
   const recs=DB.get('matchreports');
   let savedId;
   if(data._id){const i=recs.findIndex(r=>r.id===data._id);if(i>=0){recs[i]={...recs[i],...rec,id:data._id};}else recs.push({...rec,id:DB.id()});savedId=data._id;}
