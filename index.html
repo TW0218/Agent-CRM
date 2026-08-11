@@ -434,8 +434,11 @@ function rMatchReports(){
   if(!data.length)return`<div class="empty"><i class="ti ti-ball-football"></i><p>試合レポートがありません</p></div>`;
   return mrTreeHtml(data);
 }
-// 高校年代を示す大会名のキーワード
-const MR_HS_COMP=['U-18','U18','U-19','高円宮杯','インターハイ','高校','プリンスリーグ','プレミアリーグ','選手権'];
+// 高校年代を示す大会名のキーワード。クラブユース（横浜FMユース、ヴィッセル神戸U-18 等）は
+// 高校と同じ年代なので「高校」カテゴリに含める。
+const MR_HS_COMP=['U-18','U18','U-19','U17','U-17','ユース','高円宮杯','インターハイ','高校','プリンスリーグ','プレミアリーグ','選手権'];
+// チーム名から高校年代と判断できる語。クラブユースの表記ゆれをここで拾う。
+const MR_HS_TEAM=['ユース','U-18','U18','U-17','U17','高校','高等学校'];
 const MR_CATEGORIES=['大学','高校','未分類'];
 const MR_CAT_ICON={'大学':'ti-school','高校':'ti-backpack','未分類':'ti-help-circle'};
 // 試合レポートのカテゴリを決める。チーム名ではなく大会名を最優先にしている。
@@ -446,10 +449,11 @@ function mrCategory(r){
   const c=r.competition||'';
   if(c.includes('大学'))return'大学';
   if(MR_HS_COMP.some(k=>c.includes(k)))return'高校';
+  // 大会名で決まらない場合のみチーム名を見る。判定順に意味があるので入れ替えないこと。
   const t=(r.homeTeam||'')+' '+(r.awayTeam||'');
-  if(t.includes('高校'))return'高校'; // 「◯◯大学付属高校」を大学と誤判定しないよう先に見る
-  if(t.includes('大学'))return'大学';
-  if(t.includes('学園')||t.includes('ユース'))return'高校';
+  if(MR_HS_TEAM.some(k=>t.includes(k)))return'高校'; // 「流通経済大学付属柏高校」を大学と誤判定しないよう最初に見る
+  if(t.includes('大学')||t.includes('大學'))return'大学'; // 「山梨学院大学」を学園扱いしないよう学園より先に見る
+  if(t.includes('学園')||t.includes('学院')||t.includes('実業'))return'高校';
   return'未分類';
 }
 function mrIsOpen(key,depth){
