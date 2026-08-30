@@ -39,24 +39,6 @@
     "scoutStatus": "継続監視"
   },
   {
-    "id": "mq91lat5op7g",
-    "age": "21",
-    "grade": "4",
-    "notes": "監督に話はついていて、７月にアプローチ予定\n徳島内定。",
-    "scout": "石川",
-    "height": "172",
-    "weight": "70",
-    "teamName": "京都産業大学",
-    "birthdate": "2005-03-18",
-    "positions": [
-      "OMF"
-    ],
-    "strengths": "",
-    "playerName": "伊藤翼",
-    "weaknesses": "",
-    "scoutStatus": "継続監視"
-  },
-  {
     "id": "mq91ragrz36k",
     "age": "21",
     "grade": "3",
@@ -252,7 +234,7 @@
     "strengths": "抜群のクロス精度。推進力あって抜き切れる。抜ききらなくてもクロスを上げる技術あり。スピードあり。チームとしてボールを奪われたときの切り替えが早く、プレー面では負けん気も強い。",
     "playerName": "小田切颯佑",
     "weaknesses": "",
-    "scoutStatus": "獲得推奨",
+    "scoutStatus": "継続監視",
     "linkedPlayerId": ""
   },
   {
@@ -297,6 +279,27 @@
     "playerName": "林奏汰",
     "weaknesses": "対人の強度はこれから。早生まれでまだ伸びるかと。",
     "scoutStatus": "継続監視",
+    "linkedPlayerId": ""
+  },
+  {
+    "id": "mtdqnfx9zvi1",
+    "_id": "",
+    "age": "20",
+    "pdfs": [],
+    "grade": "2",
+    "notes": "",
+    "scout": "",
+    "height": "183",
+    "weight": "72",
+    "teamName": "大阪経済大学",
+    "birthdate": "2006-05-01",
+    "positions": [
+      "CB"
+    ],
+    "strengths": "",
+    "playerName": "横窪皇真",
+    "weaknesses": "",
+    "scoutStatus": "獲得推奨",
     "linkedPlayerId": ""
   }
 ]
