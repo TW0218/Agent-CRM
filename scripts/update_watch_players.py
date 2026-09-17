@@ -24,6 +24,7 @@ import plistlib
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -126,34 +127,82 @@ def report_changes(old, new, all_scouting):
             log(f"  除外: {name}（ステータスが「{rec.get('scoutStatus') or '未設定'}」に変更）")
 
 
+AUTO_COMMIT_PREFIX = "注視選手JSONを自動更新"
+# push の再試行間隔（秒）。スリープ復帰直後などネットワークが戻るまで待つ。
+RETRY_DELAYS = (30, 120, 600)
+
+
+def unpushed_commits():
+    """上流にない手元のコミットを [(sha, 件名)] で返す。上流が不明なら None。"""
+    res = git("log", "@{u}..HEAD", "--format=%H%x09%s", check=False)
+    if res.returncode != 0:
+        return None
+    return [tuple(line.split("\t", 1)) for line in res.stdout.splitlines() if line]
+
+
+def is_auto_commit(sha, subject):
+    """このスクリプト自身が作ったコミットか（件名と変更ファイルの両方で確認する）。"""
+    if not subject.startswith(AUTO_COMMIT_PREFIX):
+        return False
+    files = git("show", "--name-only", "--format=", sha).stdout.split()
+    return files == [str(OUT.relative_to(REPO))]
+
+
+def push_with_retry():
+    for i in range(len(RETRY_DELAYS) + 1):
+        res = git("push", check=False)
+        if res.returncode == 0:
+            log("push しました" if i == 0 else f"push しました（再試行 {i} 回目で成功）")
+            return True
+        err = " / ".join(res.stderr.strip().splitlines())
+        # 相手側が先に進んでいる等、待っても直らない失敗は再試行しない
+        if "rejected" in err or "non-fast-forward" in err:
+            log(f"push が拒否されました。手動で確認してください: {err}")
+            return False
+        if i == len(RETRY_DELAYS):
+            break
+        log(f"push に失敗しました。{RETRY_DELAYS[i]}秒後に再試行します（{i + 1}/{len(RETRY_DELAYS)}）: {err}")
+        time.sleep(RETRY_DELAYS[i])
+    log(f"push に失敗しました（コミットは手元に残り、次回の実行時に再度 push します）: {err}")
+    return False
+
+
+def push_pending():
+    """未 push のコミットを push する。
+
+    前回 push に失敗した自動更新コミットは次回ここで一緒に送る。
+    ただしレビュー前の手作業のコミットが混ざっている場合は、巻き込まないよう見送る。
+    """
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    if branch != "main":
+        return
+    commits = unpushed_commits()
+    if commits is None:
+        log("上流ブランチを特定できないため push は見送りました。")
+        return
+    if not commits:
+        return
+    manual = [s for sha, s in commits if not is_auto_commit(sha, s)]
+    if manual:
+        log(f"自動更新以外の未pushコミットが {len(manual)} 件あるため push は見送りました。手動で確認してください: {', '.join(manual)}")
+        return
+    if len(commits) > 1:
+        log(f"前回までに push できなかった自動更新 {len(commits) - 1} 件もあわせて push します")
+    push_with_retry()
+
+
 def commit_and_push():
-    """当該ファイルだけをコミットする。他に未pushのコミットがあれば push は見送る。"""
+    """当該ファイルだけをコミットして push する。"""
     branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     if branch != "main":
         log(f"ブランチが main ではありません（{branch}）。ファイルは更新しましたがコミットは見送ります。")
         return
 
-    # 自動 push が、レビュー前の手元のコミットを巻き込まないようにする
-    unpushed = git("rev-list", "@{u}..HEAD", "--count", check=False)
-    pending = int(unpushed.stdout.strip()) if unpushed.returncode == 0 else -1
-
     git("add", "--", str(OUT.relative_to(REPO)))
     count = len(json.loads(OUT.read_text(encoding="utf-8")))
-    git("commit", "-m", f"注視選手JSONを自動更新（{count}名）\n\nscripts/update_watch_players.py による週次更新。")
+    git("commit", "-m", f"{AUTO_COMMIT_PREFIX}（{count}名）\n\nscripts/update_watch_players.py による週次更新。")
     log("コミットしました")
-
-    if pending > 0:
-        log(f"他に未pushのコミットが {pending} 件あるため push は見送りました。手動で確認してください。")
-        return
-    if pending < 0:
-        log("上流ブランチを特定できないため push は見送りました。")
-        return
-
-    res = git("push", check=False)
-    if res.returncode == 0:
-        log("push しました")
-    else:
-        log(f"push に失敗しました（コミットは手元に残っています）: {res.stderr.strip()}")
+    push_pending()
 
 
 def main():
@@ -185,6 +234,7 @@ def main():
 
     if not git("status", "--porcelain", "--", str(OUT.relative_to(REPO))).stdout.strip():
         log("変更なし。コミットは不要です。")
+        push_pending()  # 前回 push できなかった分があれば送る
         return
 
     report_changes(old, watch, all_scouting)
