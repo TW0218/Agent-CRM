@@ -6,6 +6,8 @@ const GID_MAP = {
   '2026-7': '1314662842',  // 2026August
   '2026-8': '1583425868',  // 2026September
   '2026-9': '1913650470',  // 2026October
+  '2026-10': '90627940',   // 2026November
+  '2026-11': '1061467606', // 2026December
 };
 
 export default async function handler(req, res) {
